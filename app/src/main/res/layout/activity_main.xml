@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="20dp"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Media Companion"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:text="Auto-replies to missed calls with your business info. Install once — it runs in the background forever."
+            android:textSize="13sp"
+            android:textColor="#666666" />
+
+        <TextView android:text="App URL"
+            android:layout_marginTop="14dp" android:layout_marginBottom="4dp"
+            android:textStyle="bold" android:textSize="13sp"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText android:id="@+id/etBaseUrl"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:inputType="textUri"
+            android:hint="https://festive-post-flow.base44.app" />
+
+        <TextView android:text="Device ID"
+            android:layout_marginTop="14dp" android:layout_marginBottom="4dp"
+            android:textStyle="bold" android:textSize="13sp"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText android:id="@+id/etDeviceId"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:hint="From Auto Call SMS → Devices" />
+
+        <TextView android:text="Token"
+            android:layout_marginTop="14dp" android:layout_marginBottom="4dp"
+            android:textStyle="bold" android:textSize="13sp"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText android:id="@+id/etToken"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:hint="Webhook token" />
+
+        <Button android:id="@+id/btnSave"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Save & Start" />
+
+        <Button android:id="@+id/btnSync"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Sync Now" />
+
+        <Button android:id="@+id/btnStop"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Stop" />
+
+        <TextView android:id="@+id/tvStatus"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textSize="13sp"
+            android:textColor="#1A4545" />
+    </LinearLayout>
+</ScrollView>
