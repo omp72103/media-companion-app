@@ -44,6 +44,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnSync).setOnClickListener {
+            // Always persist whatever is currently typed before syncing, so
+            // "Sync Now" never runs against stale/empty saved values just
+            // because "Save & Start" wasn't tapped first.
+            cfg.save(baseUrl.text.toString().trim(), deviceId.text.toString().trim(), token.text.toString().trim())
             status.text = "Syncing…"
             Thread {
                 val ok = cfg.sync()
