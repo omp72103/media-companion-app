@@ -32,7 +32,17 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace --info > gradle-build.log 2>&1 || (tail -n 400 gradle-build.log && exit 1)
+        run: |
+          set +e
+          ./gradlew assembleDebug --no-daemon --stacktrace > gradle-build.log 2>&1
+          STATUS=$?
+          if [ $STATUS -ne 0 ]; then
+            echo '## Gradle build failed — last 300 lines' >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 300 gradle-build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $STATUS
 
       - name: Upload build log (always, for debugging)
         if: always()
