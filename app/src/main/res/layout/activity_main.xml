@@ -50,6 +50,18 @@
             android:layout_width="match_parent" android:layout_height="wrap_content"
             android:hint="Webhook token" />
 
+        <TextView android:text="SMS SIM"
+            android:layout_marginTop="14dp" android:layout_marginBottom="4dp"
+            android:textStyle="bold" android:textSize="13sp"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <TextView
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="On a dual-SIM phone, pick the SIM to always send from — instead of relying on the phone's own default, which can be the wrong or empty-balance SIM."
+            android:textSize="12sp" android:textColor="#666666" />
+        <Spinner android:id="@+id/spinnerSim"
+            android:layout_width="match_parent" android:layout_height="wrap_content" />
+
         <Button android:id="@+id/btnSave"
             android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
