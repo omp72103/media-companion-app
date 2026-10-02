@@ -4,8 +4,13 @@ import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.telephony.SubscriptionManager
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -77,6 +82,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         requestPerms()
+        setupSimPicker()
         if (cfg.isConfigured()) {
             // Defensive: never let a foreground-service start failure crash the
             // activity itself, or every future app open would crash-loop and
@@ -102,5 +108,35 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.startForegroundService(this, intent)
         else
             startService(intent)
+    }
+
+    /**
+     * Lists active SIMs (if any) so the user can pick which one the app
+     * always sends from, instead of trusting the phone's own default SMS
+     * SIM — which can be set to a SIM with no balance/signal while the
+     * registered business number is actually on the other SIM.
+     */
+    private fun setupSimPicker() {
+        val spinner = findViewById<Spinner>(R.id.spinnerSim)
+        val subs = runCatching {
+            getSystemService(SubscriptionManager::class.java)?.activeSubscriptionInfoList ?: emptyList()
+        }.getOrDefault(emptyList())
+
+        val labels = mutableListOf("Use phone default")
+        val ids = mutableListOf(-1)
+        subs?.forEach { info ->
+            labels.add("SIM ${info.simSlotIndex + 1} — ${info.carrierName}")
+            ids.add(info.subscriptionId)
+        }
+
+        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
+        val savedIndex = ids.indexOf(cfg.simSubscriptionId()).let { if (it < 0) 0 else it }
+        spinner.setSelection(savedIndex)
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                cfg.setSimSubscriptionId(ids[position])
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
     }
 }
