@@ -24,6 +24,13 @@ class Config(private val ctx: Context) {
     fun token(): String = prefs.getString("token", "") ?: ""
     fun isConfigured(): Boolean = deviceId().isNotEmpty() && token().isNotEmpty()
 
+    // ── Which SIM to send from on a dual-SIM phone. -1 = use Android's
+    // system default SMS SIM; otherwise an explicit subscriptionId, so the
+    // app never silently relies on whichever SIM the phone happens to have
+    // set as default (which can be the wrong/empty-balance one).
+    fun simSubscriptionId(): Int = prefs.getInt("simSubId", -1)
+    fun setSimSubscriptionId(id: Int) { prefs.edit().putInt("simSubId", id).apply() }
+
     fun save(base: String, dev: String, tok: String) {
         prefs.edit()
             .putString("baseUrl", base.ifEmpty { "https://festive-post-flow.base44.app" }.trimEnd('/'))
