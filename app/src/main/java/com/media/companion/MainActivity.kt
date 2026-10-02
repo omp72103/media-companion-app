@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnSave).setOnClickListener {
             cfg.save(baseUrl.text.toString().trim(), deviceId.text.toString().trim(), token.text.toString().trim())
             requestPerms()
-            startMonitor()
+            runCatching { startMonitor() }
             status.text = "Companion running. Missed calls will be auto-replied."
             Toast.makeText(this, "Saved & started", Toast.LENGTH_SHORT).show()
         }
@@ -64,7 +64,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         requestPerms()
-        if (cfg.isConfigured()) startMonitor()
+        if (cfg.isConfigured()) {
+            // Defensive: never let a foreground-service start failure crash the
+            // activity itself, or every future app open would crash-loop and
+            // lock the user out of the settings screen entirely.
+            runCatching { startMonitor() }
+        }
     }
 
     private fun requestPerms() {
