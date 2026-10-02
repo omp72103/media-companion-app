@@ -77,10 +77,7 @@ object SmsEngine {
         var outcome = "sent"
         var failure = ""
         try {
-            val mgr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                context.getSystemService(SmsManager::class.java)
-            else
-                @Suppress("DEPRECATION") SmsManager.getDefault()
+            val mgr = getManager(context, cfg)
             val parts = mgr.divideMessage(message)
             if (parts.size == 1) mgr.sendTextMessage(call.number, null, message, null, null)
             else mgr.sendMultipartTextMessage(call.number, null, parts, null, null)
@@ -109,10 +106,7 @@ object SmsEngine {
         val message = "[TEST] " + render(cfg)
 
         return try {
-            val mgr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                context.getSystemService(SmsManager::class.java)
-            else
-                @Suppress("DEPRECATION") SmsManager.getDefault()
+            val mgr = getManager(context, cfg)
             val parts = mgr.divideMessage(message)
             if (parts.size == 1) mgr.sendTextMessage(number, null, message, null, null)
             else mgr.sendMultipartTextMessage(number, null, parts, null, null)
@@ -120,6 +114,24 @@ object SmsEngine {
         } catch (e: Exception) {
             false to ("Send failed: " + (e.message ?: "unknown error"))
         }
+    }
+
+    /**
+     * Returns the SmsManager for whichever SIM the user picked in the app
+     * (Config.simSubscriptionId), falling back to Android's system-default
+     * SMS SIM if none was explicitly chosen (unchanged behavior for anyone
+     * who hasn't opened the SIM picker).
+     */
+    private fun getManager(context: Context, cfg: Config): SmsManager {
+        val defaultMgr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            context.getSystemService(SmsManager::class.java)
+        else
+            @Suppress("DEPRECATION") SmsManager.getDefault()
+        val subId = cfg.simSubscriptionId()
+        if (subId == -1) return defaultMgr
+        return runCatching {
+            @Suppress("DEPRECATION") SmsManager.getSmsManagerForSubscriptionId(subId)
+        }.getOrDefault(defaultMgr)
     }
 
     private fun render(cfg: Config): String {
