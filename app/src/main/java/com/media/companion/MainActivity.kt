@@ -23,7 +23,13 @@ class MainActivity : AppCompatActivity() {
 
     private val permsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* runtime grant state is re-checked by the service when it queries CallLog */ }
+    ) {
+        // Permission grant state is only known once this callback fires —
+        // refresh the SIM list now, since reading active subscriptions
+        // requires READ_PHONE_STATE and the earlier call in onCreate() may
+        // have run before the user actually answered the dialog.
+        setupSimPicker()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
