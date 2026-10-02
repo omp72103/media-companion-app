@@ -63,6 +63,19 @@ class MainActivity : AppCompatActivity() {
             status.text = "Stopped."
         }
 
+        val testNumber = findViewById<EditText>(R.id.etTestNumber)
+        findViewById<Button>(R.id.btnTestSms).setOnClickListener {
+            val number = testNumber.text.toString().trim()
+            status.text = "Sending test SMS…"
+            Thread {
+                val (ok, msg) = SmsEngine.sendTest(this, number)
+                runOnUiThread {
+                    status.text = msg
+                    Toast.makeText(this, if (ok) "Test SMS sent ✓" else "Test SMS failed", Toast.LENGTH_SHORT).show()
+                }
+            }.start()
+        }
+
         requestPerms()
         if (cfg.isConfigured()) {
             // Defensive: never let a foreground-service start failure crash the
