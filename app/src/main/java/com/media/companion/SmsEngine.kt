@@ -38,17 +38,13 @@ object SmsEngine {
 
         val eventId = "${cfg.deviceId()}:${call.number}:${call.startTime}"
 
-        if (call.type == "outgoing") {
-            report(cfg, eventId, call, "skipped", skipReason = "outgoing_call")
-            return
-        }
-
         // ── Rule evaluation (mirrors missedCallWebhook exactly) ──
         var skipReason = ""
         if (!s.optBoolean("enabled")) skipReason = "auto_sms_disabled"
         else if (call.type == "missed" && !s.optBoolean("triggerMissed")) skipReason = "missed_trigger_disabled"
         else if (call.type == "rejected" && !s.optBoolean("triggerRejected")) skipReason = "rejected_trigger_disabled"
         else if (call.type == "answered" && !s.optBoolean("triggerAnswered")) skipReason = "answered_call_no_trigger"
+        else if (call.type == "outgoing" && !s.optBoolean("triggerOutgoing")) skipReason = "outgoing_trigger_disabled"
 
         if (skipReason.isEmpty() && !s.optBoolean("recipientAll")) {
             val isContact = cfg.cachedContacts().contains(call.number)
@@ -95,6 +91,35 @@ object SmsEngine {
         }
 
         report(cfg, eventId, call, outcome, message = message, failureReason = failure)
+    }
+
+    /**
+     * Sends a one-off test SMS to a given number, bypassing every rule
+     * (triggers, recipient condition, business hours, cooldown) and the
+     * nativeCallLog report — this is a pure "does this phone's SIM actually
+     * send SMS" check, so it never affects cooldowns or the dashboard's real
+     * call/SMS history. Returns (success, message-or-error).
+     */
+    fun sendTest(context: Context, rawNumber: String): Pair<Boolean, String> {
+        val number = rawNumber.replace(Regex("\\D"), "").takeLast(10)
+        if (number.length < 10) return false to "Enter a valid 10-digit number."
+
+        val cfg = Config(context)
+        if (cfg.cachedSettings() == null) cfg.sync()
+        val message = "[TEST] " + render(cfg)
+
+        return try {
+            val mgr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                context.getSystemService(SmsManager::class.java)
+            else
+                @Suppress("DEPRECATION") SmsManager.getDefault()
+            val parts = mgr.divideMessage(message)
+            if (parts.size == 1) mgr.sendTextMessage(number, null, message, null, null)
+            else mgr.sendMultipartTextMessage(number, null, parts, null, null)
+            true to "Test SMS sent to $number."
+        } catch (e: Exception) {
+            false to ("Send failed: " + (e.message ?: "unknown error"))
+        }
     }
 
     private fun render(cfg: Config): String {
