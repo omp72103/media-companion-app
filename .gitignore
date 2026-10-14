@@ -1,0 +1,7 @@
+
+# Signing keys must never be committed to this public repo — use the KEYSTORE_BASE64 secret.
+*.keystore
+*.jks
+local.properties
+build/
+.gradle/

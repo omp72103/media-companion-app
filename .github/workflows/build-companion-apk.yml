@@ -1,23 +1,36 @@
 name: Build Companion APK
 
-# Compiles the Media companion Android app to a debug APK on every push.
-# The APK is uploaded as a downloadable artifact — grab it from the Actions
-# run page (no Android Studio or local SDK needed).
+# Builds the Media Companion app as a signed RELEASE APK.
 #
-# This workflow expects this repo to contain the contents of the
-# `android-companion-app/` folder AT THE ROOT (i.e. settings.gradle.kts,
-# build.gradle.kts, app/, and this .github/ folder all at repo root).
+#  - Every push: builds and uploads the APK as a workflow artifact.
+#  - Pushing a tag like v1.3: also publishes a GitHub Release whose asset is
+#    always named "media-companion.apk", so this link never changes:
+#      https://github.com/omp72103/media-companion-app/releases/latest/download/media-companion.apk
+#
+# SIGNING (required): every build must use the SAME key, or phones that
+# already have the app refuse the update with "App not installed".
+# Add these repository secrets (Settings → Secrets and variables → Actions):
+#   KEYSTORE_BASE64    base64 of the signing keystore (same key as the Base44 build)
+#   KEYSTORE_PASSWORD  keystore password
+#   KEY_ALIAS          key alias
+#   KEY_PASSWORD       key password
+# Without KEYSTORE_BASE64 the build still runs (to catch compile errors) but
+# nothing is published, because an unsigned APK cannot be installed.
 
 on:
   push:
-    paths:
-      - '**'
-      - '.github/workflows/build-companion-apk.yml'
+    branches: ['**']
+    tags: ['v*']
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -31,10 +44,26 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build debug APK
+      - name: Restore signing key
+        if: env.HAS_KEYSTORE == 'true'
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_ENV"
+
+      - name: Warn about missing signing key
+        if: env.HAS_KEYSTORE != 'true'
+        run: |
+          echo '## ⚠️ No signing key' >> "$GITHUB_STEP_SUMMARY"
+          echo 'KEYSTORE_BASE64 secret is not set, so the APK is unsigned and will NOT install. Nothing will be published.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build release APK
         run: |
           set +e
-          ./gradlew assembleDebug --no-daemon --stacktrace > gradle-build.log 2>&1
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace > gradle-build.log 2>&1
           STATUS=$?
           if [ $STATUS -ne 0 ]; then
             echo '## Gradle build failed — last 300 lines' >> "$GITHUB_STEP_SUMMARY"
@@ -43,6 +72,14 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
           exit $STATUS
+
+      - name: Verify signature
+        if: env.HAS_KEYSTORE == 'true'
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee -a "$GITHUB_STEP_SUMMARY"
+          cp "$APK" media-companion.apk
 
       - name: Upload build log (always, for debugging)
         if: always()
@@ -53,10 +90,22 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-      - name: Upload APK
+      - name: Upload APK artifact
+        if: env.HAS_KEYSTORE == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: media-companion-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: media-companion.apk
           retention-days: 90
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: env.HAS_KEYSTORE == 'true' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "$TAG" media-companion.apk \
+            --title "Media Companion $TAG" \
+            --notes "Install on the business phone. If Android asks, allow installing from this browser, and choose \"Install anyway\" on any Play Protect warning." \
+            --latest

@@ -32,6 +32,10 @@ class CallMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Mark "start watching from now" the moment the service starts, so the
+        // very first call after install is processed (previously that first
+        // call only set this marker and was then skipped forever).
+        if (cfg.lastCallTs == 0L) cfg.lastCallTs = System.currentTimeMillis() - 5_000L
         executor.execute { cfg.sync() }
         registerObserver()
         return START_STICKY
