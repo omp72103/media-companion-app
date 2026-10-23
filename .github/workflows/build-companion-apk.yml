@@ -60,3 +60,35 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 90
           if-no-files-found: error
+
+      # ── Signed release APK ────────────────────────────────────────────────
+      # Runs only once the signing key has been added as repo secrets
+      # (Settings → Secrets and variables → Actions):
+      #   RELEASE_KEYSTORE_B64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS
+      # A release-signed, non-debuggable build is what should be installed on
+      # business phones — debug-signed APKs are treated as high-risk by
+      # Play Protect and by payment apps' security checks.
+      - name: Build signed release APK
+        id: release
+        env:
+          KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "Release signing secrets not set — skipping signed build." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          export RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          echo "built=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed release APK
+        if: steps.release.outputs.built == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-companion-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 90
+          if-no-files-found: error

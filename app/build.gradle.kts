@@ -11,12 +11,31 @@ android {
         applicationId = "com.media.companion"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+    }
+
+    // Release signing key comes from CI secrets (never committed — this repo is
+    // public). Without it the release build is simply left unsigned and CI
+    // falls back to the debug APK exactly as before.
+    val ksPath = System.getenv("RELEASE_KEYSTORE_PATH")
+    signingConfigs {
+        if (!ksPath.isNullOrEmpty()) {
+            create("release") {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            isDebuggable = false
+            if (!ksPath.isNullOrEmpty()) signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     compileOptions {
