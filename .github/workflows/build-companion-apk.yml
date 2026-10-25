@@ -1,8 +1,7 @@
-name: Build Companion APK
+name: Build Signed Companion APK
 
-# Build both artifacts, but clearly distinguish the debug APK (development only)
-# from the signed release APK (distribution). Never publish a debug APK under
-# the generic release/download name.
+# Only publish a signed, non-debuggable APK. A debug APK must not be used for
+# distribution because this app accesses call logs and can send SMS messages.
 on:
   push:
     paths:
@@ -11,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,25 +27,54 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build debug APK (development only)
+      - name: Validate release signing configuration
+        env:
+          KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          KS_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         run: |
-          set +e
-          ./gradlew assembleDebug --no-daemon --stacktrace > gradle-build.log 2>&1
-          STATUS=$?
-          if [ $STATUS -ne 0 ]; then
-            echo '## Gradle build failed — last 300 lines' >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            tail -n 300 gradle-build.log >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          if [ -z "$KS_B64" ] || [ -z "$KS_PASSWORD" ] || [ -z "$KS_ALIAS" ]; then
+            echo "::error::Signed release not built. Configure RELEASE_KEYSTORE_B64, RELEASE_KEYSTORE_PASSWORD and RELEASE_KEY_ALIAS in repository Actions secrets. Debug APKs are not published by this workflow."
+            exit 1
           fi
-          exit $STATUS
 
-      - name: Upload debug APK (development only)
+      - name: Decode release keystore
+        env:
+          KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          echo "$KS_B64" | base64 --decode > "$RUNNER_TEMP/media-companion-release.jks"
+          test -s "$RUNNER_TEMP/media-companion-release.jks"
+
+      - name: Build signed release APK
+        env:
+          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/media-companion-release.jks
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+
+      - name: Verify release APK signature
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose "$APK"
+          CERTS=$("$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK")
+          echo "$CERTS"
+          if echo "$CERTS" | grep -qi "Signer #1 certificate DN:.*CN=Android Debug"; then
+            echo "::error::Release APK appears to use the Android debug certificate."
+            exit 1
+          fi
+
+      - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: media-companion-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 14
+          name: media-companion-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 90
           if-no-files-found: error
 
       - name: Upload build log (always, for debugging)
@@ -57,60 +85,3 @@ jobs:
           path: gradle-build.log
           retention-days: 14
           if-no-files-found: ignore
-
-      # A production APK must be signed with a stable private key. Add these
-      # repository Actions secrets before distributing the release artifact:
-      # RELEASE_KEYSTORE_B64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS.
-      - name: Validate release signing configuration
-        id: signing
-        env:
-          KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
-          KS_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          KS_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-        run: |
-          if [ -z "$KS_B64" ] || [ -z "$KS_PASSWORD" ] || [ -z "$KS_ALIAS" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Release APK not built: add all three RELEASE_KEYSTORE_* / RELEASE_KEY_ALIAS secrets. The debug APK is for development only."
-            echo "## Release APK not produced" >> "$GITHUB_STEP_SUMMARY"
-            echo "Set repository Actions secrets `RELEASE_KEYSTORE_B64`, `RELEASE_KEYSTORE_PASSWORD`, and `RELEASE_KEY_ALIAS` to build a signed release APK. Do not distribute the debug artifact." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          echo "configured=true" >> "$GITHUB_OUTPUT"
-
-      - name: Decode release keystore
-        if: steps.signing.outputs.configured == 'true'
-        env:
-          KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
-        run: |
-          set -euo pipefail
-          echo "$KS_B64" | base64 --decode > "$RUNNER_TEMP/media-companion-release.jks"
-          test -s "$RUNNER_TEMP/media-companion-release.jks"
-
-      - name: Build signed release APK
-        if: steps.signing.outputs.configured == 'true'
-        env:
-          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/media-companion-release.jks
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
-
-      - name: Verify release APK signature
-        if: steps.signing.outputs.configured == 'true'
-        run: |
-          set -euo pipefail
-          APK="app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK"
-          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose "$APK"
-          if "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK" | grep -qi "Signer #1 certificate DN:.*CN=Android Debug"; then
-            echo "::error::Release APK appears to use the Android debug certificate."
-            exit 1
-          fi
-
-      - name: Upload signed release APK
-        if: steps.signing.outputs.configured == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: media-companion-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
-          retention-days: 90
-          if-no-files-found: error
