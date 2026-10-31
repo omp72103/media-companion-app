@@ -1,10 +1,12 @@
 package com.media.companion
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.telephony.SubscriptionManager
+import android.text.method.LinkMovementMethod
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -37,6 +39,55 @@ class MainActivity : AppCompatActivity() {
 
         cfg = Config(this)
 
+        if (!cfg.consentGiven()) {
+            showConsentDialog()
+        } else {
+            setupScreen()
+        }
+    }
+
+    /**
+     * Plain-language disclosure the business owner must explicitly agree to
+     * BEFORE any Android permission dialog is shown and before the monitor
+     * service can ever start. This is a deliberate, separate step from the
+     * OS "Allow / Deny" permission prompts — those only say what an app CAN
+     * access; this says, in full sentences, what the app actually DOES with
+     * it: reads the call log, sends SMS automatically, and reports call
+     * activity to the configured business's own dashboard.
+     */
+    private fun showConsentDialog() {
+        val message = """
+            Before you continue, please read this.
+
+            This app is a missed-call auto-reply tool for THIS phone. Once you agree and set it up, it will, automatically and without asking each time:
+
+            •  Read this phone's call log (who called, when, how long, and whether the call was missed, rejected, answered, or outgoing).
+            •  Send an automatic SMS text message from this phone's own SIM in reply to missed or rejected calls, using the message template configured for this business.
+            •  Send a record of each call and SMS (caller number, call type, time, duration, and whether the SMS was sent) to the business's own dashboard server, so the owner can see call/SMS activity there.
+
+            Only set this up on a phone you own or are explicitly authorized to configure this way. The phone's owner should know this is running — a persistent notification will stay visible the whole time it's active, and you can stop it at any time from this screen.
+
+            By tapping "I Understand & Agree" you confirm you have the authority to enable this on this device and that you understand what it does.
+        """.trimIndent()
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Before you set this up")
+            .setMessage(message)
+            .setCancelable(false)
+            .setPositiveButton("I Understand & Agree") { _, _ ->
+                cfg.setConsentGiven(true)
+                setupScreen()
+            }
+            .setNegativeButton("Decline & Exit") { _, _ ->
+                finish()
+            }
+            .create()
+        dialog.show()
+        dialog.findViewById<TextView>(android.R.id.message)?.movementMethod = LinkMovementMethod.getInstance()
+    }
+
+    /** Everything that used to run unconditionally in onCreate() — now only reachable after consent. */
+    private fun setupScreen() {
         val baseUrl = findViewById<EditText>(R.id.etBaseUrl)
         val deviceId = findViewById<EditText>(R.id.etDeviceId)
         val token = findViewById<EditText>(R.id.etToken)
