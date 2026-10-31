@@ -24,6 +24,13 @@ class Config(private val ctx: Context) {
     fun token(): String = prefs.getString("token", "") ?: ""
     fun isConfigured(): Boolean = deviceId().isNotEmpty() && token().isNotEmpty()
 
+    // ── Whether the business owner has explicitly agreed to the on-device
+    // consent screen that discloses exactly what this app reads and sends,
+    // before any OS permission dialog is shown. Required before requestPerms()
+    // or the monitor service may start.
+    fun consentGiven(): Boolean = prefs.getBoolean("consentGiven", false)
+    fun setConsentGiven(v: Boolean) { prefs.edit().putBoolean("consentGiven", v).apply() }
+
     // ── Which SIM to send from on a dual-SIM phone. -1 = use Android's
     // system default SMS SIM; otherwise an explicit subscriptionId, so the
     // app never silently relies on whichever SIM the phone happens to have
