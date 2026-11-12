@@ -53,8 +53,22 @@ jobs:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            echo "===== BUILD FAILED — extracted errors ====="
+            # Surface real compiler/AAPT errors as annotations we can read via API.
+            grep -nE '^e: |error: |FAILURE:|AAPT|Unresolved reference|> Task .*FAILED|What went wrong|Caused by' gradle-build.log \
+              | head -n 25 | while IFS= read -r line; do echo "::error::${line}"; done
+            {
+              echo "### Gradle build failed — last 120 lines"
+              echo '```'
+              tail -n 120 gradle-build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit "$STATUS"
+          fi
 
       - name: Verify release APK signature
         run: |
