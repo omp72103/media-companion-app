@@ -14,7 +14,7 @@
         android:label="Missed Call Auto Reply"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:theme="@style/Theme.Material3.DayNight"
+        android:theme="@style/Theme.MissedCallAutoReply"
         android:supportsRtl="true">
 
         <activity

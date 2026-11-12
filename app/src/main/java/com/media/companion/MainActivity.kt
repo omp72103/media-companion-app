@@ -10,14 +10,16 @@ import android.text.method.LinkMovementMethod
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Button
 import android.widget.EditText
+import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.materialswitch.MaterialSwitch
 
 class MainActivity : AppCompatActivity() {
 
@@ -49,11 +51,7 @@ class MainActivity : AppCompatActivity() {
     /**
      * Plain-language disclosure the business owner must explicitly agree to
      * BEFORE any Android permission dialog is shown and before the monitor
-     * service can ever start. This is a deliberate, separate step from the
-     * OS "Allow / Deny" permission prompts — those only say what an app CAN
-     * access; this says, in full sentences, what the app actually DOES with
-     * it: reads the call log, sends SMS automatically, and reports call
-     * activity to the configured business's own dashboard.
+     * service can ever start.
      */
     private fun showConsentDialog() {
         val message = """
@@ -62,10 +60,10 @@ class MainActivity : AppCompatActivity() {
             This app is a missed-call auto-reply tool for THIS phone. Once you agree and set it up, it will, automatically and without asking each time:
 
             •  Read this phone's call log (who called, when, how long, and whether the call was missed, rejected, answered, or outgoing).
-            •  Send an automatic SMS text message from this phone's own SIM in reply to missed or rejected calls, using the message template configured for this business.
-            •  Send a record of each call and SMS (caller number, call type, time, duration, and whether the SMS was sent) to the business's own dashboard server, so the owner can see call/SMS activity there.
+            •  Send an automatic SMS text message from this phone's own SIM in reply to the call types you choose, using the message you set.
+            •  If you connect it to a dashboard, send a record of each call and SMS (caller number, call type, time, duration, and whether the SMS was sent) to that business's own dashboard server.
 
-            Only set this up on a phone you own or are explicitly authorized to configure this way. The phone's owner should know this is running — a persistent notification will stay visible the whole time it's active, and you can stop it at any time from this screen.
+            Only set this up on a phone you own or are explicitly authorized to configure this way. A persistent notification stays visible the whole time it's active, and you can stop it at any time from this screen.
 
             By tapping "I Understand & Agree" you confirm you have the authority to enable this on this device and that you understand what it does.
         """.trimIndent()
@@ -86,47 +84,92 @@ class MainActivity : AppCompatActivity() {
         dialog.findViewById<TextView>(android.R.id.message)?.movementMethod = LinkMovementMethod.getInstance()
     }
 
-    /** Everything that used to run unconditionally in onCreate() — now only reachable after consent. */
+    // Views
+    private lateinit var swEnabled: MaterialSwitch
+    private lateinit var swMissed: MaterialSwitch
+    private lateinit var swRejected: MaterialSwitch
+    private lateinit var swAnswered: MaterialSwitch
+    private lateinit var swOutgoing: MaterialSwitch
+    private lateinit var rgRecipient: RadioGroup
+    private lateinit var etBusinessName: EditText
+    private lateinit var etCallback: EditText
+    private lateinit var etMessage: EditText
+    private lateinit var etBaseUrl: EditText
+    private lateinit var etDeviceId: EditText
+    private lateinit var etToken: EditText
+    private lateinit var status: TextView
+
     private fun setupScreen() {
-        val baseUrl = findViewById<EditText>(R.id.etBaseUrl)
-        val deviceId = findViewById<EditText>(R.id.etDeviceId)
-        val token = findViewById<EditText>(R.id.etToken)
-        val status = findViewById<TextView>(R.id.tvStatus)
+        swEnabled = findViewById(R.id.swEnabled)
+        swMissed = findViewById(R.id.swMissed)
+        swRejected = findViewById(R.id.swRejected)
+        swAnswered = findViewById(R.id.swAnswered)
+        swOutgoing = findViewById(R.id.swOutgoing)
+        rgRecipient = findViewById(R.id.rgRecipient)
+        etBusinessName = findViewById(R.id.etBusinessName)
+        etCallback = findViewById(R.id.etCallback)
+        etMessage = findViewById(R.id.etMessage)
+        etBaseUrl = findViewById(R.id.etBaseUrl)
+        etDeviceId = findViewById(R.id.etDeviceId)
+        etToken = findViewById(R.id.etToken)
+        status = findViewById(R.id.tvStatus)
 
-        baseUrl.setText(cfg.baseUrl())
-        deviceId.setText(cfg.deviceId())
-        token.setText(cfg.token())
+        // ── Prefill from saved values (defaults are sensible on first run) ──
+        swEnabled.isChecked = cfg.localEnabled()
+        swMissed.isChecked = cfg.localTrigMissed()
+        swRejected.isChecked = cfg.localTrigRejected()
+        swAnswered.isChecked = cfg.localTrigAnswered()
+        swOutgoing.isChecked = cfg.localTrigOutgoing()
+        when (cfg.localRecipientMode()) {
+            1 -> rgRecipient.check(R.id.rbUnknown)
+            2 -> rgRecipient.check(R.id.rbContacts)
+            else -> rgRecipient.check(R.id.rbEveryone)
+        }
+        etBusinessName.setText(cfg.localBusinessName())
+        etCallback.setText(cfg.localCallback())
+        etMessage.setText(cfg.localMessage())
+        etBaseUrl.setText(cfg.baseUrl())
+        etDeviceId.setText(cfg.deviceId())
+        etToken.setText(cfg.token())
 
-        findViewById<Button>(R.id.btnSave).setOnClickListener {
-            cfg.save(baseUrl.text.toString().trim(), deviceId.text.toString().trim(), token.text.toString().trim())
+        if (cfg.isConfigured() || cfg.localRulesSet()) {
+            status.text = "Running — replying to calls automatically."
+        }
+
+        findViewById<MaterialButton>(R.id.btnSave).setOnClickListener {
+            persistAll()
             requestPerms()
             runCatching { startMonitor() }
-            status.text = "Companion running. Missed calls will be auto-replied."
+            status.text = "Saved. Replying to calls automatically."
             Toast.makeText(this, "Saved & started", Toast.LENGTH_SHORT).show()
         }
 
-        findViewById<Button>(R.id.btnSync).setOnClickListener {
-            // Always persist whatever is currently typed before syncing, so
-            // "Sync Now" never runs against stale/empty saved values just
-            // because "Save & Start" wasn't tapped first.
-            cfg.save(baseUrl.text.toString().trim(), deviceId.text.toString().trim(), token.text.toString().trim())
+        findViewById<MaterialButton>(R.id.btnSync).setOnClickListener {
+            // Persist whatever is on screen first, so a sync never discards
+            // on-device edits the user just made.
+            persistAll()
             status.text = "Syncing…"
             Thread {
                 val ok = cfg.sync()
                 runOnUiThread {
-                    status.text = if (ok) "Synced with server. Companion ready." else "Sync failed — check Device ID & Token."
+                    status.text = if (ok) {
+                        "Synced with dashboard. Rules saved on-device still apply."
+                    } else {
+                        "Sync failed — check App URL, Device ID & Token."
+                    }
                     Toast.makeText(this, if (ok) "Synced ✓" else "Sync failed", Toast.LENGTH_SHORT).show()
                 }
             }.start()
         }
 
-        findViewById<Button>(R.id.btnStop).setOnClickListener {
+        findViewById<MaterialButton>(R.id.btnStop).setOnClickListener {
             stopService(Intent(this, CallMonitorService::class.java))
-            status.text = "Stopped."
+            status.text = "Stopped. No automatic replies will be sent."
         }
 
         val testNumber = findViewById<EditText>(R.id.etTestNumber)
-        findViewById<Button>(R.id.btnTestSms).setOnClickListener {
+        findViewById<MaterialButton>(R.id.btnTestSms).setOnClickListener {
+            persistAll() // so the test uses the message currently on screen
             val number = testNumber.text.toString().trim()
             status.text = "Sending test SMS…"
             Thread {
@@ -140,12 +183,34 @@ class MainActivity : AppCompatActivity() {
 
         requestPerms()
         setupSimPicker()
-        if (cfg.isConfigured()) {
-            // Defensive: never let a foreground-service start failure crash the
-            // activity itself, or every future app open would crash-loop and
-            // lock the user out of the settings screen entirely.
+        if (cfg.isConfigured() || cfg.localRulesSet()) {
             runCatching { startMonitor() }
         }
+    }
+
+    /** Saves both the connection fields and the on-device rules. */
+    private fun persistAll() {
+        cfg.save(
+            etBaseUrl.text.toString().trim(),
+            etDeviceId.text.toString().trim(),
+            etToken.text.toString().trim()
+        )
+        val recipientMode = when (rgRecipient.checkedRadioButtonId) {
+            R.id.rbUnknown -> 1
+            R.id.rbContacts -> 2
+            else -> 0
+        }
+        cfg.saveRules(
+            enabled = swEnabled.isChecked,
+            missed = swMissed.isChecked,
+            rejected = swRejected.isChecked,
+            answered = swAnswered.isChecked,
+            outgoing = swOutgoing.isChecked,
+            recipientMode = recipientMode,
+            message = etMessage.text.toString().trim(),
+            businessName = etBusinessName.text.toString().trim(),
+            callback = etCallback.text.toString().trim()
+        )
     }
 
     private fun requestPerms() {
@@ -169,9 +234,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Lists active SIMs (if any) so the user can pick which one the app
-     * always sends from, instead of trusting the phone's own default SMS
-     * SIM — which can be set to a SIM with no balance/signal while the
-     * registered business number is actually on the other SIM.
+     * always sends from, instead of trusting the phone's own default SMS SIM.
      */
     private fun setupSimPicker() {
         val spinner = findViewById<Spinner>(R.id.spinnerSim)

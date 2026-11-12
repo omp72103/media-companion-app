@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="white">#FFFFFFFF</color>
+    <color name="brand_primary">#0F766E</color>
+    <color name="brand_primary_dark">#115E59</color>
+    <color name="brand_primary_container">#D3F3EE</color>
+    <color name="brand_on_primary_container">#0B3D39</color>
+    <color name="app_bg">#EEF3F2</color>
+    <color name="card_bg">#FFFFFFFF</color>
+    <color name="text_primary">#131C19</color>
+    <color name="text_secondary">#5C6B67</color>
+    <color name="text_hint">#90A09B</color>
+    <color name="divider">#E3EAE8</color>
+    <color name="danger">#B3261E</color>
+    <color name="pill_bg">#22FFFFFF</color>
+    <color name="pill_stroke">#4DFFFFFF</color>
+</resources>

@@ -1,102 +1,409 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="20dp"
-    android:background="#FFFFFF">
+    android:fillViewport="true"
+    android:background="@color/app_bg">
 
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Media Companion"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <TextView
+        <!-- ============ Branded header ============ -->
+        <LinearLayout
+            android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            android:text="Auto-replies to missed calls with your business info. Install once — it runs in the background forever."
-            android:textSize="13sp"
-            android:textColor="#666666" />
+            android:background="@drawable/header_gradient"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="26dp"
+            android:paddingBottom="22dp">
 
-        <TextView android:text="App URL"
-            android:layout_marginTop="14dp" android:layout_marginBottom="4dp"
-            android:textStyle="bold" android:textSize="13sp"
-            android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <EditText android:id="@+id/etBaseUrl"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:inputType="textUri"
-            android:hint="https://festive-post-flow.base44.app" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Missed Call Auto Reply"
+                android:textColor="@color/white"
+                android:textSize="23sp"
+                android:textStyle="bold" />
 
-        <TextView android:text="Device ID"
-            android:layout_marginTop="14dp" android:layout_marginBottom="4dp"
-            android:textStyle="bold" android:textSize="13sp"
-            android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <EditText android:id="@+id/etDeviceId"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="From Auto Call SMS → Devices" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Automatically texts your callers back from this phone's own SIM."
+                android:textColor="@color/white"
+                android:alpha="0.85"
+                android:textSize="13sp" />
 
-        <TextView android:text="Token"
-            android:layout_marginTop="14dp" android:layout_marginBottom="4dp"
-            android:textStyle="bold" android:textSize="13sp"
-            android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <EditText android:id="@+id/etToken"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="Webhook token" />
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/status_pill_bg"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="7dp"
+                android:paddingBottom="7dp"
+                android:text="Not running yet — set it up below"
+                android:textColor="@color/white"
+                android:textSize="12sp" />
+        </LinearLayout>
 
-        <TextView android:text="SMS SIM"
-            android:layout_marginTop="14dp" android:layout_marginBottom="4dp"
-            android:textStyle="bold" android:textSize="13sp"
-            android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <TextView
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp"
-            android:text="On a dual-SIM phone, pick the SIM to always send from — instead of relying on the phone's own default, which can be the wrong or empty-balance SIM."
-            android:textSize="12sp" android:textColor="#666666" />
-        <Spinner android:id="@+id/spinnerSim"
-            android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <!-- ============ Content ============ -->
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp">
 
-        <Button android:id="@+id/btnSave"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Save &amp; Start" />
+            <!-- ---------- Reply rules ---------- -->
+            <TextView style="@style/SectionLabel" android:text="WHEN TO REPLY" />
 
-        <Button android:id="@+id/btnSync"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Sync Now" />
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:cardBackgroundColor="@color/card_bg">
 
-        <Button android:id="@+id/btnStop"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Stop" />
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
 
-        <TextView android:text="Test SMS"
-            android:layout_marginTop="24dp" android:layout_marginBottom="4dp"
-            android:textStyle="bold" android:textSize="13sp"
-            android:layout_width="wrap_content" android:layout_height="wrap_content" />
-        <TextView
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp"
-            android:text="Send a test SMS to any number to confirm this phone can actually send texts, independent of call rules."
-            android:textSize="12sp" android:textColor="#666666" />
-        <EditText android:id="@+id/etTestNumber"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:inputType="phone"
-            android:hint="10-digit number to test" />
-        <Button android:id="@+id/btnTestSms"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Send Test SMS" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swEnabled"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Auto-reply turned ON"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary"
+                        android:checked="true" />
 
-        <TextView android:id="@+id/tvStatus"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:textSize="13sp"
-            android:textColor="#1A4545" />
+                    <TextView style="@style/HelpText"
+                        android:text="Master switch. When off, no automatic SMS is sent for any call."
+                        android:layout_marginBottom="6dp" />
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp"
+                        android:background="@color/divider"
+                        android:layout_marginTop="10dp" android:layout_marginBottom="6dp" />
+
+                    <TextView style="@style/FieldLabel"
+                        android:text="Reply to these call types"
+                        android:layout_marginTop="6dp" android:layout_marginBottom="2dp" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swMissed"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Missed calls"
+                        android:textSize="15sp" android:textColor="@color/text_primary"
+                        android:checked="true" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swRejected"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Rejected calls"
+                        android:textSize="15sp" android:textColor="@color/text_primary"
+                        android:checked="true" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swAnswered"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Answered incoming calls"
+                        android:textSize="15sp" android:textColor="@color/text_primary" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swOutgoing"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Outgoing calls I make"
+                        android:textSize="15sp" android:textColor="@color/text_primary" />
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp"
+                        android:background="@color/divider"
+                        android:layout_marginTop="10dp" android:layout_marginBottom="8dp" />
+
+                    <TextView style="@style/FieldLabel"
+                        android:text="Who should receive the SMS"
+                        android:layout_marginBottom="4dp" />
+
+                    <RadioGroup
+                        android:id="@+id/rgRecipient"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <RadioButton android:id="@+id/rbEveryone"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:minHeight="44dp"
+                            android:text="Everyone who calls"
+                            android:textSize="15sp" android:textColor="@color/text_primary"
+                            android:checked="true" />
+
+                        <RadioButton android:id="@+id/rbUnknown"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:minHeight="44dp"
+                            android:text="Only numbers NOT saved in contacts"
+                            android:textSize="15sp" android:textColor="@color/text_primary" />
+
+                        <RadioButton android:id="@+id/rbContacts"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:minHeight="44dp"
+                            android:text="Only numbers saved in contacts"
+                            android:textSize="15sp" android:textColor="@color/text_primary" />
+                    </RadioGroup>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ---------- Message ---------- -->
+            <TextView style="@style/SectionLabel" android:text="THE MESSAGE" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:cardBackgroundColor="@color/card_bg">
+
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Business name (shown in the message)">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etBusinessName"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapWords" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="Call-back number (optional)">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etCallback"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="phone" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="Message to send back">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etMessage"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minLines="3"
+                            android:gravity="top"
+                            android:inputType="textMultiLine|textCapSentences" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView style="@style/HelpText"
+                        android:layout_marginTop="8dp"
+                        android:text="Leave the message blank to use a sensible default. You can use {{businessName}} and {{callbackNumber}} and they will be filled in automatically." />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ---------- SIM ---------- -->
+            <TextView style="@style/SectionLabel" android:text="SIM FOR SENDING" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:cardBackgroundColor="@color/card_bg">
+
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <Spinner android:id="@+id/spinnerSim"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp" />
+
+                    <TextView style="@style/HelpText"
+                        android:layout_marginTop="6dp"
+                        android:text="On a dual-SIM phone, pick the SIM to always send from, instead of the phone's default (which may be the wrong or empty-balance SIM)." />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ---------- Connection ---------- -->
+            <TextView style="@style/SectionLabel" android:text="CONNECTION (DASHBOARD)" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:cardBackgroundColor="@color/card_bg">
+
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="App URL">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etBaseUrl"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textUri" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="Device ID">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etDeviceId"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="Token">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etToken"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView style="@style/HelpText"
+                        android:layout_marginTop="8dp"
+                        android:text="Used only to pull your saved rules/contacts and to show call &amp; SMS history on your dashboard. The app still works for sending even if this is left blank." />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ---------- Actions ---------- -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSave"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:text="Save &amp; Start"
+                android:textSize="16sp"
+                app:cornerRadius="14dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSync"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Sync rules from dashboard"
+                app:cornerRadius="14dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnStop"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Stop auto-reply"
+                app:cornerRadius="14dp" />
+
+            <!-- ---------- Test SMS ---------- -->
+            <TextView style="@style/SectionLabel"
+                android:layout_marginTop="24dp"
+                android:text="TEST SMS" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:cardBackgroundColor="@color/card_bg">
+
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="10-digit number to test">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etTestNumber"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="phone" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnTestSms"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="Send test SMS"
+                        app:cornerRadius="14dp" />
+
+                    <TextView style="@style/HelpText"
+                        android:layout_marginTop="8dp"
+                        android:text="Confirms this phone can actually send texts, independent of the call rules above." />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="Because this app reads call logs and sends SMS, Android Play Protect may warn when it is installed from outside the Play Store. That is expected. For best results install it on a dedicated business phone."
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:lineSpacingMultiplier="1.2" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

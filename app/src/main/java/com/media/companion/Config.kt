@@ -38,6 +38,42 @@ class Config(private val ctx: Context) {
     fun simSubscriptionId(): Int = prefs.getInt("simSubId", -1)
     fun setSimSubscriptionId(id: Int) { prefs.edit().putInt("simSubId", id).apply() }
 
+    // ── On-device rules (set from the app's own screen) ──
+    // These let the business owner configure WHEN to reply, WHO gets the SMS
+    // and the MESSAGE text directly on the phone, without needing the
+    // dashboard. Once saved, they take precedence over whatever the server
+    // sync returned; business hours and cooldown (not exposed on-device) are
+    // still taken from the synced settings when present.
+    fun localRulesSet(): Boolean = prefs.getBoolean("l_set", false)
+    fun localEnabled(): Boolean = prefs.getBoolean("l_enabled", true)
+    fun localTrigMissed(): Boolean = prefs.getBoolean("l_missed", true)
+    fun localTrigRejected(): Boolean = prefs.getBoolean("l_rejected", true)
+    fun localTrigAnswered(): Boolean = prefs.getBoolean("l_answered", false)
+    fun localTrigOutgoing(): Boolean = prefs.getBoolean("l_outgoing", false)
+    fun localRecipientMode(): Int = prefs.getInt("l_recip", 0) // 0 everyone, 1 unknown-only, 2 contacts-only
+    fun localMessage(): String = prefs.getString("l_msg", "") ?: ""
+    fun localBusinessName(): String = prefs.getString("l_biz", "") ?: ""
+    fun localCallback(): String = prefs.getString("l_cb", "") ?: ""
+
+    fun saveRules(
+        enabled: Boolean, missed: Boolean, rejected: Boolean, answered: Boolean,
+        outgoing: Boolean, recipientMode: Int, message: String,
+        businessName: String, callback: String
+    ) {
+        prefs.edit()
+            .putBoolean("l_set", true)
+            .putBoolean("l_enabled", enabled)
+            .putBoolean("l_missed", missed)
+            .putBoolean("l_rejected", rejected)
+            .putBoolean("l_answered", answered)
+            .putBoolean("l_outgoing", outgoing)
+            .putInt("l_recip", recipientMode)
+            .putString("l_msg", message)
+            .putString("l_biz", businessName)
+            .putString("l_cb", callback)
+            .apply()
+    }
+
     fun save(base: String, dev: String, tok: String) {
         prefs.edit()
             .putString("baseUrl", base.ifEmpty { "https://festive-post-flow.base44.app" }.trimEnd('/'))
@@ -56,6 +92,42 @@ class Config(private val ctx: Context) {
     fun businessName(): String = prefs.getString("businessName", "us") ?: "us"
     fun callbackNumber(): String = prefs.getString("callbackNumber", "") ?: ""
     fun devicePhone(): String = prefs.getString("devicePhone", "") ?: ""
+
+    // ── Effective config = on-device rules layered over synced settings ──
+    // The engine reads these so a phone configured entirely on-device works
+    // with no dashboard at all, while a phone that also syncs still gets
+    // business-hours / cooldown from the server.
+    fun effectiveSettings(): JSONObject {
+        val base = cachedSettings() ?: JSONObject()
+        if (!localRulesSet()) return base
+        base.put("enabled", localEnabled())
+        base.put("triggerMissed", localTrigMissed())
+        base.put("triggerRejected", localTrigRejected())
+        base.put("triggerAnswered", localTrigAnswered())
+        base.put("triggerOutgoing", localTrigOutgoing())
+        base.put("recipientAll", localRecipientMode() == 0)
+        base.put("recipientUnknown", localRecipientMode() == 1)
+        base.put("recipientContacts", localRecipientMode() == 2)
+        return base
+    }
+
+    fun effectiveTemplate(): String {
+        val l = localMessage()
+        if (localRulesSet() && l.isNotBlank()) return l
+        return cachedTemplate() ?: ""
+    }
+
+    fun effectiveBusinessName(): String {
+        val l = localBusinessName()
+        if (localRulesSet() && l.isNotBlank()) return l
+        return businessName()
+    }
+
+    fun effectiveCallback(): String {
+        val l = localCallback()
+        if (localRulesSet() && l.isNotBlank()) return l
+        return callbackNumber().ifEmpty { devicePhone() }
+    }
 
     // ── Cooldown tracking (per caller number) ──
     fun lastSentAt(number: String): Long = prefs.getLong("cd_$number", 0L)

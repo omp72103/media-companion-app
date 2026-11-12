@@ -32,9 +32,11 @@ object SmsEngine {
 
     fun handle(context: Context, call: Call) {
         val cfg = Config(context)
-        // Make sure we have rules; if never synced, try once now.
-        if (cfg.cachedSettings() == null) cfg.sync()
-        val s = cfg.cachedSettings() ?: JSONObject()
+        // Make sure we have rules; if the phone was never configured on-device
+        // and never synced, try a sync once now. When on-device rules are set,
+        // they define everything needed and no server is required.
+        if (cfg.cachedSettings() == null && !cfg.localRulesSet()) cfg.sync()
+        val s = cfg.effectiveSettings()
 
         val eventId = "${cfg.deviceId()}:${call.number}:${call.startTime}"
 
@@ -102,7 +104,7 @@ object SmsEngine {
         if (number.length < 10) return false to "Enter a valid 10-digit number."
 
         val cfg = Config(context)
-        if (cfg.cachedSettings() == null) cfg.sync()
+        if (cfg.cachedSettings() == null && !cfg.localRulesSet()) cfg.sync()
         val message = "[TEST] " + render(cfg)
 
         return try {
@@ -135,9 +137,9 @@ object SmsEngine {
     }
 
     private fun render(cfg: Config): String {
-        val tpl = cfg.cachedTemplate() ?: ""
-        val businessName = cfg.businessName()
-        val callback = cfg.callbackNumber().ifEmpty { cfg.devicePhone() }
+        val tpl = cfg.effectiveTemplate()
+        val businessName = cfg.effectiveBusinessName()
+        val callback = cfg.effectiveCallback()
         val base = if (tpl.isNotEmpty()) tpl else (
             if (callback.isNotEmpty())
                 "Thanks for calling {{businessName}}! We missed your call — call us back at {{callbackNumber}} and we'll get back to you shortly."
