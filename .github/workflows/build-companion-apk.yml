@@ -26,6 +26,8 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: true
 
       - name: Validate release signing configuration
         env:
@@ -57,13 +59,12 @@ jobs:
           ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle-build.log
           STATUS=${PIPESTATUS[0]}
           if [ "$STATUS" -ne 0 ]; then
-            # Consolidate the real compiler/AAPT errors into ONE annotation
-            # (newlines encoded as %0A) so it survives GitHub's per-step
-            # annotation cap and is readable via the API.
-            ERR=$(grep -nE '^e: |error: |FAILURE:|AAPT|Unresolved reference|> Task .*FAILED|What went wrong|Caused by|Exception' gradle-build.log | head -n 40)
-            [ -z "$ERR" ] && ERR=$(tail -n 50 gradle-build.log)
-            ENC=$(printf '%s' "$ERR" | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g;s/\r//g')
-            echo "::error title=Gradle errors::${ENC}"
+            # Emit each real compiler/AAPT error as its own annotation (cache
+            # is disabled above, so warning noise no longer crowds these out).
+            grep -nE '^e: |error: |FAILURE:|AAPT:|Unresolved reference|> Task .*FAILED|What went wrong|Caused by' gradle-build.log \
+              | head -n 10 | while IFS= read -r line; do
+                  echo "::error::$(printf '%s' "$line" | tr -d '\r')"
+                done
             exit "$STATUS"
           fi
 
