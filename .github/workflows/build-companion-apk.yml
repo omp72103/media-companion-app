@@ -57,16 +57,13 @@ jobs:
           ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle-build.log
           STATUS=${PIPESTATUS[0]}
           if [ "$STATUS" -ne 0 ]; then
-            echo "===== BUILD FAILED — extracted errors ====="
-            # Surface real compiler/AAPT errors as annotations we can read via API.
-            grep -nE '^e: |error: |FAILURE:|AAPT|Unresolved reference|> Task .*FAILED|What went wrong|Caused by' gradle-build.log \
-              | head -n 25 | while IFS= read -r line; do echo "::error::${line}"; done
-            {
-              echo "### Gradle build failed — last 120 lines"
-              echo '```'
-              tail -n 120 gradle-build.log
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
+            # Consolidate the real compiler/AAPT errors into ONE annotation
+            # (newlines encoded as %0A) so it survives GitHub's per-step
+            # annotation cap and is readable via the API.
+            ERR=$(grep -nE '^e: |error: |FAILURE:|AAPT|Unresolved reference|> Task .*FAILED|What went wrong|Caused by|Exception' gradle-build.log | head -n 40)
+            [ -z "$ERR" ] && ERR=$(tail -n 50 gradle-build.log)
+            ENC=$(printf '%s' "$ERR" | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g;s/\r//g')
+            echo "::error title=Gradle errors::${ENC}"
             exit "$STATUS"
           fi
 
