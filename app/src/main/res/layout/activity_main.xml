@@ -61,7 +61,7 @@
             android:layout_height="wrap_content"
             android:padding="16dp">
 
-            <!-- ---------- Reply rules ---------- -->
+            <!-- Reply rules -->
             <TextView style="@style/SectionLabel" android:text="WHEN TO REPLY" />
 
             <com.google.android.material.card.MaterialCardView
@@ -166,7 +166,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ---------- Message ---------- -->
+            <!-- Message -->
             <TextView style="@style/SectionLabel" android:text="THE MESSAGE" />
 
             <com.google.android.material.card.MaterialCardView
@@ -229,7 +229,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ---------- SIM ---------- -->
+            <!-- SIM -->
             <TextView style="@style/SectionLabel" android:text="SIM FOR SENDING" />
 
             <com.google.android.material.card.MaterialCardView
@@ -257,7 +257,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ---------- Connection ---------- -->
+            <!-- Connection -->
             <TextView style="@style/SectionLabel" android:text="CONNECTION (DASHBOARD)" />
 
             <com.google.android.material.card.MaterialCardView
@@ -318,7 +318,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ---------- Actions ---------- -->
+            <!-- Actions -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSave"
                 android:layout_width="match_parent"
@@ -347,7 +347,7 @@
                 android:text="Stop auto-reply"
                 app:cornerRadius="14dp" />
 
-            <!-- ---------- Test SMS ---------- -->
+            <!-- Test SMS -->
             <TextView style="@style/SectionLabel"
                 android:layout_marginTop="24dp"
                 android:text="TEST SMS" />
