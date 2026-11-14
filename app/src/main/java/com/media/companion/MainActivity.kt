@@ -97,6 +97,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etMessage: EditText
     private lateinit var etFollowupHours: EditText
     private lateinit var etFollowupMessage: EditText
+    private lateinit var swWhatsapp: MaterialSwitch
+    private lateinit var swWhatsappBusiness: MaterialSwitch
+    private lateinit var etWhatsappMessage: EditText
     private lateinit var etBaseUrl: EditText
     private lateinit var etDeviceId: EditText
     private lateinit var etToken: EditText
@@ -115,6 +118,9 @@ class MainActivity : AppCompatActivity() {
         etMessage = findViewById(R.id.etMessage)
         etFollowupHours = findViewById(R.id.etFollowupHours)
         etFollowupMessage = findViewById(R.id.etFollowupMessage)
+        swWhatsapp = findViewById(R.id.swWhatsapp)
+        swWhatsappBusiness = findViewById(R.id.swWhatsappBusiness)
+        etWhatsappMessage = findViewById(R.id.etWhatsappMessage)
         etBaseUrl = findViewById(R.id.etBaseUrl)
         etDeviceId = findViewById(R.id.etDeviceId)
         etToken = findViewById(R.id.etToken)
@@ -137,6 +143,9 @@ class MainActivity : AppCompatActivity() {
         swFollowup.isChecked = cfg.localFollowupEnabled()
         etFollowupHours.setText(cfg.localFollowupHours().toString())
         etFollowupMessage.setText(cfg.localFollowupMessage())
+        swWhatsapp.isChecked = cfg.localWhatsappEnabled()
+        swWhatsappBusiness.isChecked = cfg.localWhatsappBusiness()
+        etWhatsappMessage.setText(cfg.localWhatsappMessage())
         etBaseUrl.setText(cfg.baseUrl())
         etDeviceId.setText(cfg.deviceId())
         etToken.setText(cfg.token())
@@ -174,6 +183,23 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.btnStop).setOnClickListener {
             stopService(Intent(this, CallMonitorService::class.java))
             status.text = "Stopped. No automatic replies will be sent."
+        }
+
+        findViewById<MaterialButton>(R.id.btnWaAccess).setOnClickListener {
+            persistAll()
+            WhatsAppSender.openAccessibilitySettings(this)
+            Toast.makeText(this, "Enable \"Missed Call Auto Reply\" in the list", Toast.LENGTH_LONG).show()
+        }
+
+        findViewById<MaterialButton>(R.id.btnWaOverlay).setOnClickListener {
+            runCatching {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:$packageName")
+                    )
+                )
+            }
         }
 
         val testNumber = findViewById<EditText>(R.id.etTestNumber)
@@ -223,6 +249,11 @@ class MainActivity : AppCompatActivity() {
             followupEnabled = swFollowup.isChecked,
             followupHours = followupHours,
             followupMessage = etFollowupMessage.text.toString().trim()
+        )
+        cfg.saveWhatsapp(
+            enabled = swWhatsapp.isChecked,
+            useBusiness = swWhatsappBusiness.isChecked,
+            message = etWhatsappMessage.text.toString().trim()
         )
     }
 

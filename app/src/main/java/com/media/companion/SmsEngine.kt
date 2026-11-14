@@ -106,6 +106,13 @@ object SmsEngine {
         }
 
         report(cfg, eventId, call, outcome, message = message, failureReason = failure)
+
+        // Optional WhatsApp copy of the reply (same rules already passed).
+        if (cfg.localWhatsappEnabled()) {
+            runCatching {
+                WhatsAppSender.send(context, call.number, renderWhatsapp(cfg), cfg.localWhatsappBusiness())
+            }
+        }
     }
 
     // ── Follow-up SMS scheduling (WorkManager) ──
@@ -241,6 +248,13 @@ object SmsEngine {
                 "Hi, just following up on your recent call to {{businessName}}. We'd still love to help — please reach out when convenient."
         )
         return substitute(cfg, base)
+    }
+
+    private fun renderWhatsapp(cfg: Config): String {
+        val tpl = cfg.localWhatsappMessage()
+        // Fall back to the SMS reply text when no WhatsApp-specific text is set.
+        if (tpl.isNotEmpty()) return substitute(cfg, tpl)
+        return render(cfg)
     }
 
     private fun substitute(cfg: Config, base: String): String {

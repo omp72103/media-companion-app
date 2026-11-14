@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wa_accessibility_desc">Lets Missed Call Auto Reply send your WhatsApp reply automatically after a call, by tapping the Send button in WhatsApp for you. It only acts right after a missed-call reply is triggered and only inside WhatsApp. You can turn it off any time here in Accessibility settings.</string>
+    <string name="wa_accessibility_summary">Taps \"send\" in WhatsApp to deliver your missed-call auto-reply.</string>
+</resources>

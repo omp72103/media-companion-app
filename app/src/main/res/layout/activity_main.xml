@@ -290,6 +290,90 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- WhatsApp -->
+            <TextView style="@style/SectionLabel" android:text="WHATSAPP (OPTIONAL)" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:cardBackgroundColor="@color/card_bg">
+
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swWhatsapp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Also send the reply on WhatsApp"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView style="@style/HelpText"
+                        android:text="Sends from this phone's own WhatsApp. For fully automatic sending, turn on the Accessibility service below. If it isn't on, you'll get a one-tap notification instead." />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swWhatsappBusiness"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:layout_marginTop="4dp"
+                        android:text="Use the WhatsApp Business app"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="WhatsApp message (optional, uses SMS text if blank)">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etWhatsappMessage"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minLines="2"
+                            android:gravity="top"
+                            android:inputType="textMultiLine|textCapSentences" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnWaAccess"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Turn on automatic sending (Accessibility)"
+                        app:cornerRadius="14dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnWaOverlay"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Allow display over other apps"
+                        app:cornerRadius="14dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="Heads up: automating WhatsApp is against WhatsApp's terms and can get this number restricted or banned, and the Accessibility permission makes Play Protect warn more (some phones, like Pixel, block it). Use a dedicated business number."
+                        android:textSize="11sp"
+                        android:textColor="@color/danger"
+                        android:lineSpacingMultiplier="1.2" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- SIM -->
             <TextView style="@style/SectionLabel" android:text="SIM FOR SENDING" />
 

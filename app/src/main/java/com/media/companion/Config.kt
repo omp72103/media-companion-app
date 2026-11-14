@@ -61,6 +61,22 @@ class Config(private val ctx: Context) {
     fun localFollowupHours(): Int = prefs.getInt("l_fu_h", 12).coerceIn(1, 168)
     fun localFollowupMessage(): String = prefs.getString("l_fu_msg", "") ?: ""
 
+    // ── Optional WhatsApp auto-reply (Accessibility-driven). Off by default.
+    // Sends from the phone's own WhatsApp by automating its UI; needs the
+    // Accessibility service enabled, otherwise it falls back to a one-tap
+    // notification. See WhatsAppSender / WhatsAppAutoSendService.
+    fun localWhatsappEnabled(): Boolean = prefs.getBoolean("l_wa", false)
+    fun localWhatsappBusiness(): Boolean = prefs.getBoolean("l_wa_biz", false)
+    fun localWhatsappMessage(): String = prefs.getString("l_wa_msg", "") ?: ""
+
+    fun saveWhatsapp(enabled: Boolean, useBusiness: Boolean, message: String) {
+        prefs.edit()
+            .putBoolean("l_wa", enabled)
+            .putBoolean("l_wa_biz", useBusiness)
+            .putString("l_wa_msg", message)
+            .apply()
+    }
+
     fun saveRules(
         enabled: Boolean, missed: Boolean, rejected: Boolean, answered: Boolean,
         outgoing: Boolean, recipientMode: Int, message: String,
