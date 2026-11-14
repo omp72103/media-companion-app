@@ -55,10 +55,17 @@ class Config(private val ctx: Context) {
     fun localBusinessName(): String = prefs.getString("l_biz", "") ?: ""
     fun localCallback(): String = prefs.getString("l_cb", "") ?: ""
 
+    // ── Optional follow-up SMS: if the caller hasn't called again within N
+    // hours of the first auto-reply, send one more nudge. Off by default.
+    fun localFollowupEnabled(): Boolean = prefs.getBoolean("l_fu", false)
+    fun localFollowupHours(): Int = prefs.getInt("l_fu_h", 12).coerceIn(1, 168)
+    fun localFollowupMessage(): String = prefs.getString("l_fu_msg", "") ?: ""
+
     fun saveRules(
         enabled: Boolean, missed: Boolean, rejected: Boolean, answered: Boolean,
         outgoing: Boolean, recipientMode: Int, message: String,
-        businessName: String, callback: String
+        businessName: String, callback: String,
+        followupEnabled: Boolean, followupHours: Int, followupMessage: String
     ) {
         prefs.edit()
             .putBoolean("l_set", true)
@@ -71,6 +78,9 @@ class Config(private val ctx: Context) {
             .putString("l_msg", message)
             .putString("l_biz", businessName)
             .putString("l_cb", callback)
+            .putBoolean("l_fu", followupEnabled)
+            .putInt("l_fu_h", followupHours.coerceIn(1, 168))
+            .putString("l_fu_msg", followupMessage)
             .apply()
     }
 

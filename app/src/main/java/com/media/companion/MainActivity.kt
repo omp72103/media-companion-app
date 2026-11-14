@@ -90,10 +90,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swRejected: MaterialSwitch
     private lateinit var swAnswered: MaterialSwitch
     private lateinit var swOutgoing: MaterialSwitch
+    private lateinit var swFollowup: MaterialSwitch
     private lateinit var rgRecipient: RadioGroup
     private lateinit var etBusinessName: EditText
     private lateinit var etCallback: EditText
     private lateinit var etMessage: EditText
+    private lateinit var etFollowupHours: EditText
+    private lateinit var etFollowupMessage: EditText
     private lateinit var etBaseUrl: EditText
     private lateinit var etDeviceId: EditText
     private lateinit var etToken: EditText
@@ -105,10 +108,13 @@ class MainActivity : AppCompatActivity() {
         swRejected = findViewById(R.id.swRejected)
         swAnswered = findViewById(R.id.swAnswered)
         swOutgoing = findViewById(R.id.swOutgoing)
+        swFollowup = findViewById(R.id.swFollowup)
         rgRecipient = findViewById(R.id.rgRecipient)
         etBusinessName = findViewById(R.id.etBusinessName)
         etCallback = findViewById(R.id.etCallback)
         etMessage = findViewById(R.id.etMessage)
+        etFollowupHours = findViewById(R.id.etFollowupHours)
+        etFollowupMessage = findViewById(R.id.etFollowupMessage)
         etBaseUrl = findViewById(R.id.etBaseUrl)
         etDeviceId = findViewById(R.id.etDeviceId)
         etToken = findViewById(R.id.etToken)
@@ -128,6 +134,9 @@ class MainActivity : AppCompatActivity() {
         etBusinessName.setText(cfg.localBusinessName())
         etCallback.setText(cfg.localCallback())
         etMessage.setText(cfg.localMessage())
+        swFollowup.isChecked = cfg.localFollowupEnabled()
+        etFollowupHours.setText(cfg.localFollowupHours().toString())
+        etFollowupMessage.setText(cfg.localFollowupMessage())
         etBaseUrl.setText(cfg.baseUrl())
         etDeviceId.setText(cfg.deviceId())
         etToken.setText(cfg.token())
@@ -200,6 +209,7 @@ class MainActivity : AppCompatActivity() {
             R.id.rbContacts -> 2
             else -> 0
         }
+        val followupHours = etFollowupHours.text.toString().trim().toIntOrNull() ?: 12
         cfg.saveRules(
             enabled = swEnabled.isChecked,
             missed = swMissed.isChecked,
@@ -209,7 +219,10 @@ class MainActivity : AppCompatActivity() {
             recipientMode = recipientMode,
             message = etMessage.text.toString().trim(),
             businessName = etBusinessName.text.toString().trim(),
-            callback = etCallback.text.toString().trim()
+            callback = etCallback.text.toString().trim(),
+            followupEnabled = swFollowup.isChecked,
+            followupHours = followupHours,
+            followupMessage = etFollowupMessage.text.toString().trim()
         )
     }
 

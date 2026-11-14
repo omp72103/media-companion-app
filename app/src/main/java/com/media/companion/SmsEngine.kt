@@ -2,7 +2,12 @@ package com.media.companion
 
 import android.content.Context
 import android.os.Build
+import android.provider.CallLog
 import android.telephony.SmsManager
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
@@ -11,6 +16,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * The decision + send + report engine — runs entirely on the phone.
@@ -37,6 +43,11 @@ object SmsEngine {
         // they define everything needed and no server is required.
         if (cfg.cachedSettings() == null && !cfg.localRulesSet()) cfg.sync()
         val s = cfg.effectiveSettings()
+
+        // A call from this number just arrived, so any pending follow-up for
+        // them is moot — cancel it. If we end up sending a reply below, a
+        // fresh follow-up is scheduled afterwards.
+        cancelFollowup(context, call.number)
 
         val eventId = "${cfg.deviceId()}:${call.number}:${call.startTime}"
 
@@ -84,12 +95,84 @@ object SmsEngine {
             if (parts.size == 1) mgr.sendTextMessage(call.number, null, message, null, null)
             else mgr.sendMultipartTextMessage(call.number, null, parts, null, null)
             cfg.markSent(call.number, System.currentTimeMillis())
+            // Reply went out — if the follow-up is on, arm it. It fires only
+            // if the caller hasn't called again by then (re-checked at send).
+            if (cfg.localFollowupEnabled()) {
+                scheduleFollowup(context, call.number, cfg.localFollowupHours())
+            }
         } catch (e: Exception) {
             outcome = "failed"
             failure = (e.message ?: "Send error").take(200)
         }
 
         report(cfg, eventId, call, outcome, message = message, failureReason = failure)
+    }
+
+    // ── Follow-up SMS scheduling (WorkManager) ──
+
+    private fun followupWorkName(number: String) = "followup_$number"
+
+    fun scheduleFollowup(context: Context, number: String, hours: Int) {
+        val data = workDataOf("number" to number, "baseTime" to System.currentTimeMillis())
+        val req = OneTimeWorkRequestBuilder<FollowupWorker>()
+            .setInitialDelay(hours.toLong(), TimeUnit.HOURS)
+            .setInputData(data)
+            .addTag("followup")
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(followupWorkName(number), ExistingWorkPolicy.REPLACE, req)
+    }
+
+    fun cancelFollowup(context: Context, number: String) {
+        runCatching { WorkManager.getInstance(context).cancelUniqueWork(followupWorkName(number)) }
+    }
+
+    /**
+     * Runs when a scheduled follow-up fires. Sends the follow-up SMS only if
+     * the caller has NOT called (or been called) again since the original
+     * reply — otherwise they already reconnected and no nudge is needed.
+     */
+    fun sendFollowupNow(context: Context, number: String, baseTime: Long) {
+        val cfg = Config(context)
+        if (!cfg.localFollowupEnabled()) return
+        if (!cfg.effectiveSettings().optBoolean("enabled")) return
+        // They reconnected in the meantime → skip.
+        if (hasCallSince(context, number, baseTime)) return
+
+        val message = renderFollowup(cfg)
+        var outcome = "sent"
+        var failure = ""
+        try {
+            val mgr = getManager(context, cfg)
+            val parts = mgr.divideMessage(message)
+            if (parts.size == 1) mgr.sendTextMessage(number, null, message, null, null)
+            else mgr.sendMultipartTextMessage(number, null, parts, null, null)
+            cfg.markSent(number, System.currentTimeMillis())
+        } catch (e: Exception) {
+            outcome = "failed"
+            failure = (e.message ?: "Send error").take(200)
+        }
+        val eventId = "${cfg.deviceId()}:$number:followup:$baseTime"
+        report(cfg, eventId, Call(number, "followup", System.currentTimeMillis(), 0L),
+            outcome, message = message, failureReason = failure)
+    }
+
+    /** True if the call log has any call to/from [number] after [since] (epoch ms). */
+    private fun hasCallSince(context: Context, number: String, since: Long): Boolean {
+        val proj = arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.DATE)
+        val cur = runCatching {
+            context.contentResolver.query(
+                CallLog.Calls.CONTENT_URI, proj,
+                "${CallLog.Calls.DATE} > ?", arrayOf(since.toString()), null
+            )
+        }.getOrNull() ?: return false
+        cur.use {
+            while (it.moveToNext()) {
+                val n = it.getString(0)?.replace(Regex("\\D"), "")?.takeLast(10) ?: continue
+                if (n == number) return true
+            }
+        }
+        return false
     }
 
     /**
@@ -138,7 +221,6 @@ object SmsEngine {
 
     private fun render(cfg: Config): String {
         val tpl = cfg.effectiveTemplate()
-        val businessName = cfg.effectiveBusinessName()
         val callback = cfg.effectiveCallback()
         val base = if (tpl.isNotEmpty()) tpl else (
             if (callback.isNotEmpty())
@@ -146,6 +228,24 @@ object SmsEngine {
             else
                 "Thanks for calling {{businessName}}! We missed your call — our team will get back to you shortly."
         )
+        return substitute(cfg, base)
+    }
+
+    private fun renderFollowup(cfg: Config): String {
+        val tpl = cfg.localFollowupMessage()
+        val callback = cfg.effectiveCallback()
+        val base = if (tpl.isNotEmpty()) tpl else (
+            if (callback.isNotEmpty())
+                "Hi, just following up on your recent call to {{businessName}}. We'd still love to help — please call us at {{callbackNumber}}."
+            else
+                "Hi, just following up on your recent call to {{businessName}}. We'd still love to help — please reach out when convenient."
+        )
+        return substitute(cfg, base)
+    }
+
+    private fun substitute(cfg: Config, base: String): String {
+        val businessName = cfg.effectiveBusinessName()
+        val callback = cfg.effectiveCallback()
         val now = Date()
         return base
             .replace("{{businessName}}", businessName)
