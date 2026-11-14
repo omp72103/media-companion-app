@@ -61,6 +61,73 @@
             android:layout_height="wrap_content"
             android:padding="16dp">
 
+            <!-- Status -->
+            <TextView style="@style/SectionLabel" android:text="STATUS" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:cardBackgroundColor="@color/card_bg">
+
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/tvDiag"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary"
+                        android:lineSpacingMultiplier="1.3"
+                        android:fontFamily="monospace"
+                        android:text="Checking…" />
+
+                    <TextView
+                        android:id="@+id/tvDiagHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:visibility="gone"
+                        android:textSize="12sp"
+                        android:textColor="@color/danger"
+                        android:lineSpacingMultiplier="1.2"
+                        android:text="Some permissions are off, so replies can't send. Tap &quot;Open app settings&quot; → Permissions and allow Phone, Call logs and SMS. On Pixel / Android 13+, first open the ⋮ menu on that screen and choose &quot;Allow restricted settings&quot; — otherwise Call log and SMS stay blocked for sideloaded apps." />
+
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnRecheck"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="6dp"
+                            android:text="Re-check"
+                            app:cornerRadius="14dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnAppSettings"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Open app settings"
+                            app:cornerRadius="14dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Reply rules -->
             <TextView style="@style/SectionLabel" android:text="WHEN TO REPLY" />
 

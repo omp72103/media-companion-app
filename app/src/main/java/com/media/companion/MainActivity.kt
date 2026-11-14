@@ -3,7 +3,10 @@ package com.media.companion
 import android.Manifest
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.os.Bundle
 import android.telephony.SubscriptionManager
 import android.text.method.LinkMovementMethod
@@ -104,6 +107,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etDeviceId: EditText
     private lateinit var etToken: EditText
     private lateinit var status: TextView
+    private lateinit var tvDiag: TextView
+    private lateinit var tvDiagHint: TextView
 
     private fun setupScreen() {
         swEnabled = findViewById(R.id.swEnabled)
@@ -125,6 +130,8 @@ class MainActivity : AppCompatActivity() {
         etDeviceId = findViewById(R.id.etDeviceId)
         etToken = findViewById(R.id.etToken)
         status = findViewById(R.id.tvStatus)
+        tvDiag = findViewById(R.id.tvDiag)
+        tvDiagHint = findViewById(R.id.tvDiagHint)
 
         // ── Prefill from saved values (defaults are sensible on first run) ──
         swEnabled.isChecked = cfg.localEnabled()
@@ -195,8 +202,21 @@ class MainActivity : AppCompatActivity() {
             runCatching {
                 startActivity(
                     Intent(
-                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        android.net.Uri.parse("package:$packageName")
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
+                    )
+                )
+            }
+        }
+
+        findViewById<MaterialButton>(R.id.btnRecheck).setOnClickListener { refreshStatus() }
+
+        findViewById<MaterialButton>(R.id.btnAppSettings).setOnClickListener {
+            runCatching {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:$packageName")
                     )
                 )
             }
@@ -255,6 +275,39 @@ class MainActivity : AppCompatActivity() {
             useBusiness = swWhatsappBusiness.isChecked,
             message = etWhatsappMessage.text.toString().trim()
         )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::tvDiag.isInitialized) refreshStatus()
+    }
+
+    /** Live readout of the things that must be on for replies to actually send. */
+    private fun refreshStatus() {
+        fun granted(p: String) =
+            ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
+        val sms = granted(Manifest.permission.SEND_SMS)
+        val callLog = granted(Manifest.permission.READ_CALL_LOG)
+        val phone = granted(Manifest.permission.READ_PHONE_STATE)
+        val notif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            granted(Manifest.permission.POST_NOTIFICATIONS) else true
+        val running = CallMonitorService.isRunning
+
+        fun mark(b: Boolean) = if (b) "✔" else "✘"
+        val sb = StringBuilder()
+        sb.append("${mark(sms)}  SMS sending permission\n")
+        sb.append("${mark(callLog)}  Call log access\n")
+        sb.append("${mark(phone)}  Phone state\n")
+        sb.append("${mark(notif)}  Notifications\n")
+        sb.append("${mark(running)}  Auto-reply service running")
+        if (cfg.localWhatsappEnabled()) {
+            val waAcc = WhatsAppSender.isAccessibilityEnabled(this)
+            val overlay = Settings.canDrawOverlays(this)
+            sb.append("\n${mark(waAcc)}  WhatsApp auto-send (Accessibility)")
+            sb.append("\n${mark(overlay)}  Display over other apps")
+        }
+        tvDiag.text = sb.toString()
+        tvDiagHint.visibility = if (!sms || !callLog || !phone) View.VISIBLE else View.GONE
     }
 
     private fun requestPerms() {

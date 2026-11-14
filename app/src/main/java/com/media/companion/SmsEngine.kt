@@ -109,8 +109,16 @@ object SmsEngine {
 
         // Optional WhatsApp copy of the reply (same rules already passed).
         if (cfg.localWhatsappEnabled()) {
+            val waMsg = renderWhatsapp(cfg)
+            val auto = WhatsAppSender.isAccessibilityEnabled(context)
             runCatching {
-                WhatsAppSender.send(context, call.number, renderWhatsapp(cfg), cfg.localWhatsappBusiness())
+                WhatsAppSender.send(context, call.number, waMsg, cfg.localWhatsappBusiness())
+            }
+            // Log auto-sent WhatsApp replies to the dashboard. The one-tap
+            // fallback is a manual action, so it isn't logged as sent here.
+            if (auto) {
+                val waEventId = "${cfg.deviceId()}:${call.number}:whatsapp:${call.startTime}"
+                report(cfg, waEventId, call, "sent", message = waMsg, channel = "whatsapp")
             }
         }
     }
@@ -288,7 +296,8 @@ object SmsEngine {
 
     private fun report(
         cfg: Config, eventId: String, call: Call, outcome: String,
-        message: String = "", skipReason: String = "", failureReason: String = ""
+        message: String = "", skipReason: String = "", failureReason: String = "",
+        channel: String = "sms"
     ) {
         runCatching {
             val body = JSONObject().apply {
@@ -297,6 +306,7 @@ object SmsEngine {
                 put("eventId", eventId)
                 put("callerNumber", call.number)
                 put("callType", call.type)
+                put("channel", channel)
                 put("startTime", java.time.Instant.ofEpochMilli(call.startTime).toString())
                 put("duration", call.duration)
                 put("smsOutcome", outcome)

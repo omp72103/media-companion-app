@@ -20,6 +20,11 @@ import java.util.concurrent.Executors
  */
 class CallMonitorService : Service() {
 
+    companion object {
+        /** Read by the setup screen's status panel to show if monitoring is live. */
+        @Volatile var isRunning = false
+    }
+
     private val executor = Executors.newSingleThreadExecutor()
     private var observer: ContentObserver? = null
     private lateinit var cfg: Config
@@ -29,6 +34,7 @@ class CallMonitorService : Service() {
         cfg = Config(this)
         createChannel()
         startForeground(1, buildNotification("Monitoring missed calls…"))
+        isRunning = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -93,6 +99,7 @@ class CallMonitorService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         observer?.let { contentResolver.unregisterContentObserver(it) }
         observer = null
         executor.shutdownNow()
