@@ -44,6 +44,24 @@ object WhatsAppSender {
 
     @Volatile private var pendingNumber: String? = null
     @Volatile private var pendingUntil: Long = 0L
+    @Volatile private var pendingOpened = false
+
+    // ── Diagnostics: the last thing that happened, shown in the STATUS card,
+    // so a failure says exactly which step broke instead of "not sent".
+    fun lastResult(c: Context): String =
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("last", "") ?: ""
+
+    private fun setResult(c: Context, text: String) {
+        val t = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date())
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("last", "$t — $text").apply()
+    }
+
+    /** Called by the Accessibility service as soon as a WhatsApp window appears. */
+    fun onWhatsAppOpened(context: Context) {
+        if (!hasPending() || pendingOpened) return
+        pendingOpened = true
+        setResult(context, "WhatsApp opened for $pendingNumber, tapping Send…")
+    }
 
     fun hasPending(): Boolean = pendingNumber != null && System.currentTimeMillis() < pendingUntil
     fun clearPending() { pendingNumber = null; pendingUntil = 0L }
@@ -52,6 +70,7 @@ object WhatsAppSender {
     fun onSent(context: Context) {
         val n = pendingNumber
         clearPending()
+        setResult(context, "Sent to $n ✓")
         if (n != null) {
             val entry = findInQueue(context, n)
             removeFromQueue(context, n)
@@ -72,6 +91,7 @@ object WhatsAppSender {
     fun onInvalidNumber(context: Context) {
         val n = pendingNumber
         clearPending()
+        setResult(context, "$n is not on WhatsApp — skipped")
         if (n != null) removeFromQueue(context, n)
         main.postDelayed({ process(context) }, 1500)
     }
@@ -84,6 +104,7 @@ object WhatsAppSender {
         if (!isAccessibilityEnabled(context)) {
             notifyOneTap(context, number, message, pkg)
             notifyAutoSendOff(context)
+            setResult(context, "Auto-send (Accessibility) was OFF — sent as tap notification")
             return
         }
         enqueue(context, number, message, pkg, eventId, startTime)
@@ -109,10 +130,14 @@ object WhatsAppSender {
             }
             saveQueue(app, JSONArray())
             notifyAutoSendOff(app)
+            setResult(app, "Auto-send (Accessibility) was OFF — sent as tap notification")
             return
         }
         if (hasPending()) return
-        if (!isUnlocked(app)) return // will run again on unlock
+        if (!isUnlocked(app)) { // will run again on unlock
+            setResult(app, "Phone locked — WhatsApp reply waiting, sends on unlock")
+            return
+        }
 
         val now = System.currentTimeMillis()
         val o = q.getJSONObject(0)
@@ -125,20 +150,31 @@ object WhatsAppSender {
             main.post { process(app) }
             return
         }
+        if (WhatsAppAutoSendService.instance == null) {
+            // Enabled in Settings but the system hasn't (re)started it.
+            setResult(app, "Auto-send is ON in Settings but not running — turn it OFF and ON again")
+        }
 
         o.put("a", attempts + 1)
         saveQueue(app, q)
         pendingNumber = number
         pendingUntil = now + SEND_TIMEOUT_MS
+        pendingOpened = false
+        setResult(app, "Opening WhatsApp for $number (try ${attempts + 1}/$MAX_ATTEMPTS)…")
         if (!launchChat(app, number, msg, pkg)) {
-            // WhatsApp (this variant) not installed — nothing to automate.
             clearPending()
             removeFromQueue(app, number)
+            setResult(app, if (pkg == "com.whatsapp.w4b") "WhatsApp Business is not installed — turn off 'Use the WhatsApp Business app'"
+                           else "WhatsApp is not installed — or turn on 'Use the WhatsApp Business app'")
             return
         }
-        // If Send wasn't tapped in time, retry (up to MAX_ATTEMPTS).
+        // If Send wasn't tapped in time, record WHY, then retry (up to MAX_ATTEMPTS).
         main.postDelayed({
             if (pendingNumber == number && System.currentTimeMillis() >= pendingUntil) {
+                setResult(app, if (!pendingOpened)
+                    "BLOCKED: phone did not let WhatsApp open. Allow 'Display over other apps' and, on Realme/Oppo, App info → Other permissions → 'Display pop-up windows while running in background'"
+                else
+                    "WhatsApp opened but the Send button wasn't found — update WhatsApp, then try again")
                 clearPending()
                 process(app)
             }
@@ -227,6 +263,12 @@ object WhatsAppSender {
     }
 
     fun queuedCount(c: Context): Int = loadQueue(c).length()
+
+    /** Test path used by the app's test buttons — same queue and auto-send as a real call. */
+    fun sendTest(context: Context, number: String, message: String, useBusiness: Boolean) {
+        clearPending()
+        send(context.applicationContext, number, message, useBusiness)
+    }
 
     private fun findInQueue(c: Context, number: String): JSONObject? {
         val q = loadQueue(c)

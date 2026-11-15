@@ -189,6 +189,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         val testNumber = findViewById<EditText>(R.id.etTestNumber)
+        fun waTest(delayMs: Long) {
+            persistAll()
+            val number = testNumber.text.toString().replace(Regex("\\D"), "").takeLast(10)
+            if (number.length < 10) { status.text = "Enter a valid 10-digit number."; return }
+            if (!WhatsAppSender.isAccessibilityEnabled(this)) {
+                status.text = "Turn on automatic sending (Accessibility) first."
+            }
+            val biz = cfg.localWhatsappBusiness()
+            status.text = if (delayMs > 0) "Press Home now — WhatsApp test fires in 10 sec…" else "Sending test WhatsApp…"
+            Thread {
+                val msg = "[TEST] " + SmsEngine.currentMessage(this)
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    WhatsAppSender.sendTest(applicationContext, number, msg, biz)
+                }, delayMs)
+            }.start()
+        }
+        findViewById<MaterialButton>(R.id.btnTestWa).setOnClickListener { waTest(0) }
+        findViewById<MaterialButton>(R.id.btnTestWaBg).setOnClickListener { waTest(10_000) }
+
         findViewById<MaterialButton>(R.id.btnTestSms).setOnClickListener {
             persistAll()
             val number = testNumber.text.toString().trim()
@@ -298,6 +317,8 @@ class MainActivity : AppCompatActivity() {
             val pm = getSystemService(android.os.PowerManager::class.java)
             val battery = pm?.isIgnoringBatteryOptimizations(packageName) ?: false
             sb.append("\n${mark(battery)}  Battery: not killed in background")
+            val last = WhatsAppSender.lastResult(this)
+            if (last.isNotEmpty()) sb.append("\n\nLast WhatsApp: $last")
             val waiting = WhatsAppSender.queuedCount(this)
             if (waiting > 0) sb.append("\n⏳  $waiting WhatsApp repl${if (waiting == 1) "y" else "ies"} waiting for unlock")
         }

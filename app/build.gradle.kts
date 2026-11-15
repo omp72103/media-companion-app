@@ -11,8 +11,8 @@ android {
         applicationId = "com.media.companion"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.8"
     }
 
     // Release signing key comes from CI secrets (never committed — this repo is

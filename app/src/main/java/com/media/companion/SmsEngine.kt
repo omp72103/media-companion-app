@@ -121,6 +121,13 @@ object SmsEngine {
         }
     }
 
+    /** The exact reply text Media has set (used by the WhatsApp test buttons). */
+    fun currentMessage(context: Context): String {
+        val cfg = Config(context)
+        cfg.sync(timeoutMs = 8000)
+        return render(cfg)
+    }
+
     /** Logs a WhatsApp reply that was really sent (called off the main thread). */
     fun reportWhatsappSent(context: Context, number: String, message: String, eventId: String, startTime: Long) {
         val cfg = Config(context)

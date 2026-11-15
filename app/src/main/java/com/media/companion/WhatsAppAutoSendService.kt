@@ -35,6 +35,7 @@ class WhatsAppAutoSendService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         if (pkg != "com.whatsapp" && pkg != "com.whatsapp.w4b") return
         if (!WhatsAppSender.hasPending()) return
+        WhatsAppSender.onWhatsAppOpened(this)
 
         val root = rootInActiveWindow ?: return
         try {
