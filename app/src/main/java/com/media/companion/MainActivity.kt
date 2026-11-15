@@ -356,6 +356,9 @@ class MainActivity : AppCompatActivity() {
         sb.append("${mark(phone)}  Phone state\n")
         sb.append("${mark(notif)}  Notifications\n")
         sb.append("${mark(running)}  Auto-reply service running")
+        if (cfg.isConfigured()) {
+            sb.append("\n${mark(cfg.deviceRemotelyOn())}  Enabled from dashboard")
+        }
         if (cfg.localWhatsappEnabled()) {
             val waAcc = WhatsAppSender.isAccessibilityEnabled(this)
             val overlay = Settings.canDrawOverlays(this)

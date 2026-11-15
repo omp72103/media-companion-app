@@ -96,6 +96,14 @@ class Config(private val ctx: Context) {
     fun callbackNumber(): String = prefs.getString("callbackNumber", "") ?: ""
     fun devicePhone(): String = prefs.getString("devicePhone", "") ?: ""
 
+    // ── Remote on/off from the dashboard (per device). The dashboard's
+    // "Disable Auto SMS" / inactive status is a hard master switch that the
+    // app must obey. Defaults to enabled so a never-synced/offline device
+    // keeps working (fail-open) until a sync says otherwise.
+    fun deviceRemoteEnabled(): Boolean = prefs.getBoolean("deviceEnabled", true)
+    fun deviceStatus(): String = prefs.getString("deviceStatus", "active") ?: "active"
+    fun deviceRemotelyOn(): Boolean = deviceRemoteEnabled() && deviceStatus() == "active"
+
     // ── Effective config = exactly what Media synced ──
     // If the phone has never synced, fall back to the same defaults the
     // server uses for a business that never saved its rules.
@@ -196,6 +204,8 @@ class Config(private val ctx: Context) {
                     .putString("businessName", biz.optString("businessName"))
                     .putString("callbackNumber", s.optString("callbackNumber"))
                     .putString("devicePhone", dev.optString("phoneNumber"))
+                    .putBoolean("deviceEnabled", dev.optBoolean("autoSmsEnabled", true))
+                    .putString("deviceStatus", dev.optString("status", "active"))
                     .putStringSet("contacts", contacts)
                     .putLong("lastSyncAt", System.currentTimeMillis())
                     .apply()

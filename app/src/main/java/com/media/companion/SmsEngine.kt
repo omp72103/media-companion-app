@@ -54,7 +54,10 @@ object SmsEngine {
 
         // ── Rule evaluation (mirrors missedCallWebhook exactly) ──
         var skipReason = ""
-        if (!s.optBoolean("enabled")) skipReason = "auto_sms_disabled"
+        // Master kill-switch: the dashboard can turn this specific device off
+        // (or mark it inactive). That overrides every local rule.
+        if (cfg.isConfigured() && !cfg.deviceRemotelyOn()) skipReason = "disabled_by_dashboard"
+        else if (!s.optBoolean("enabled")) skipReason = "auto_sms_disabled"
         else if (call.type == "missed" && !s.optBoolean("triggerMissed")) skipReason = "missed_trigger_disabled"
         else if (call.type == "rejected" && !s.optBoolean("triggerRejected")) skipReason = "rejected_trigger_disabled"
         else if (call.type == "answered" && !s.optBoolean("triggerAnswered")) skipReason = "answered_call_no_trigger"
