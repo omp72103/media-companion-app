@@ -146,7 +146,61 @@
                     android:padding="16dp">
 
                     <TextView style="@style/FieldLabel"
-                        android:text="Reply to"
+                        android:text="Send a reply for these calls"
+                        android:layout_marginBottom="2dp" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swEnabled"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Auto-reply ON"
+                        android:textSize="16sp" android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swIncomingAll"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Incoming call (all of the 3 below)"
+                        android:textSize="16sp" android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swAnswered"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Received call (घेतलेला)"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swMissed"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Missed call (चुकलेला)"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swRejected"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Rejected call (कट केलेला)"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swOutgoing"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Outgoing call (तुम्ही केलेला)"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView style="@style/HelpText"
+                        android:text="These switches are the same as in the Media app — change them here or there, both stay in sync." />
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp"
+                        android:background="@color/divider"
+                        android:layout_marginTop="10dp" android:layout_marginBottom="8dp" />
+
+                    <TextView style="@style/FieldLabel"
+                        android:text="Who gets it / how often"
                         android:layout_marginBottom="4dp" />
 
                     <TextView
@@ -177,7 +231,7 @@
 
                     <TextView style="@style/HelpText"
                         android:layout_marginTop="10dp"
-                        android:text="To change which calls get a reply, who gets it, or the message text, edit it in the Media app (Auto SMS). The phone picks up changes on the next call automatically." />
+                        android:text="The message text, who gets it and how often are set in the Media app (Auto SMS). The phone picks up changes on the next call automatically." />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

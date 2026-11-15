@@ -112,6 +112,32 @@ class Config(private val ctx: Context) {
     }
 
     fun effectiveTemplate(): String = cachedTemplate() ?: ""
+
+    /** Updates the cached copy right away so the next call uses the new switch even before sync. */
+    fun putCachedSetting(key: String, value: Boolean) {
+        val s = effectiveSettings()
+        s.put(key, value)
+        prefs.edit().putString("settings", s.toString()).apply()
+    }
+
+    /** Saves call-type switches to Media (nativeUpdateRules). Returns true on success. */
+    fun pushRules(values: Map<String, Boolean>): Boolean {
+        if (!isConfigured()) return false
+        return runCatching {
+            val body = JSONObject().apply {
+                put("device", deviceId()); put("token", token())
+                values.forEach { (k, v) -> put(k, v) }
+            }
+            val conn = (URL("${baseUrl()}/functions/nativeUpdateRules").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"; connectTimeout = 15000; readTimeout = 15000
+                doOutput = true; setRequestProperty("Content-Type", "application/json")
+            }
+            try {
+                java.io.OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+                conn.responseCode in 200..299
+            } finally { conn.disconnect() }
+        }.getOrDefault(false)
+    }
     fun effectiveBusinessName(): String = businessName()
     fun effectiveCallback(): String = callbackNumber().ifEmpty { devicePhone() }
     fun lastSyncAt(): Long = prefs.getLong("lastSyncAt", 0L)

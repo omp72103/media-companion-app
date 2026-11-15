@@ -88,6 +88,9 @@ class MainActivity : AppCompatActivity() {
 
     // Views
     private lateinit var tvRules: TextView
+    private val ruleSwitches = linkedMapOf<String, MaterialSwitch>()
+    private lateinit var swIncomingAll: MaterialSwitch
+    private var bindingRules = false
     private lateinit var tvMessagePreview: TextView
     private lateinit var swFollowup: MaterialSwitch
     private lateinit var etFollowupHours: EditText
@@ -102,6 +105,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupScreen() {
         tvRules = findViewById(R.id.tvRules)
+        ruleSwitches["enabled"] = findViewById(R.id.swEnabled)
+        ruleSwitches["triggerAnswered"] = findViewById(R.id.swAnswered)
+        ruleSwitches["triggerMissed"] = findViewById(R.id.swMissed)
+        ruleSwitches["triggerRejected"] = findViewById(R.id.swRejected)
+        ruleSwitches["triggerOutgoing"] = findViewById(R.id.swOutgoing)
+        swIncomingAll = findViewById(R.id.swIncomingAll)
+        ruleSwitches.forEach { (key, sw) ->
+            sw.setOnCheckedChangeListener { _, on -> if (!bindingRules) saveRules(mapOf(key to on)) }
+        }
+        swIncomingAll.setOnCheckedChangeListener { _, on ->
+            if (!bindingRules) saveRules(mapOf("triggerAnswered" to on, "triggerMissed" to on, "triggerRejected" to on))
+        }
         tvMessagePreview = findViewById(R.id.tvMessagePreview)
         swFollowup = findViewById(R.id.swFollowup)
         etFollowupHours = findViewById(R.id.etFollowupHours)
@@ -255,16 +270,41 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    /** Read-only view of what Media has set for this phone. */
+    /** Saves switch changes on the phone at once, then to Media (reverts if Media can't be reached). */
+    private fun saveRules(values: Map<String, Boolean>) {
+        values.forEach { (k, v) -> cfg.putCachedSetting(k, v) }
+        showSynced()
+        status.text = "Saving to Media…"
+        Thread {
+            val ok = cfg.pushRules(values)
+            if (ok) cfg.sync()
+            runOnUiThread {
+                showSynced()
+                status.text = if (ok) "Saved to Media ✓" else "Couldn't reach Media — saved on this phone; will retry on next Sync."
+                if (!ok) Toast.makeText(this, "Not saved to Media — check internet", Toast.LENGTH_SHORT).show()
+            }
+        }.start()
+    }
+
+    /** View of what Media has set for this phone (switches + summary). */
     private fun showSynced() {
         if (!::tvRules.isInitialized) return
+        cfg.effectiveSettings().let { d ->
+            bindingRules = true
+            ruleSwitches.forEach { (key, sw) -> sw.isChecked = d.optBoolean(key) }
+            swIncomingAll.isChecked = d.optBoolean("triggerAnswered") && d.optBoolean("triggerMissed") && d.optBoolean("triggerRejected")
+            bindingRules = false
+        }
         if (cfg.cachedSettings() == null) {
             tvRules.text = "Not synced yet — tap Sync now."
             tvMessagePreview.text = "—"
             return
         }
         val s = cfg.effectiveSettings()
-        fun mark(b: Boolean) = if (b) "✔" else "✘"
+        bindingRules = true
+        ruleSwitches.forEach { (key, sw) -> sw.isChecked = s.optBoolean(key) }
+        swIncomingAll.isChecked = s.optBoolean("triggerAnswered") && s.optBoolean("triggerMissed") && s.optBoolean("triggerRejected")
+        bindingRules = false
         val cd = s.optDouble("cooldownHours", 0.0)
         val who = when {
             s.optBoolean("recipientAll") -> "Everyone"
@@ -274,11 +314,7 @@ class MainActivity : AppCompatActivity() {
             else -> "Nobody (pick recipients in Media)"
         }
         tvRules.text = buildString {
-            if (!s.optBoolean("enabled")) append("⚠ Auto-reply is OFF in Media\n")
-            append("${mark(s.optBoolean("triggerMissed"))}  Missed calls\n")
-            append("${mark(s.optBoolean("triggerRejected"))}  Rejected calls\n")
-            append("${mark(s.optBoolean("triggerAnswered"))}  Answered calls\n")
-            append("${mark(s.optBoolean("triggerOutgoing"))}  Outgoing calls\n")
+            if (!s.optBoolean("enabled")) append("⚠ Auto-reply is OFF\n")
             append("To: $who\n")
             append(if (cd <= 0.0) "Every call gets a reply" else "Same number: once every ${if (cd % 1.0 == 0.0) cd.toInt().toString() else cd.toString()} h")
         }
