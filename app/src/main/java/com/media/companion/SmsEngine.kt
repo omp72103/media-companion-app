@@ -38,10 +38,10 @@ object SmsEngine {
 
     fun handle(context: Context, call: Call) {
         val cfg = Config(context)
-        // Make sure we have rules; if the phone was never configured on-device
-        // and never synced, try a sync once now. When on-device rules are set,
-        // they define everything needed and no server is required.
-        if (cfg.cachedSettings() == null && !cfg.localRulesSet()) cfg.sync()
+        // Pull the latest rules + message from Media right now, so a change
+        // made in Media applies to the very next call. Short timeout: if the
+        // phone is offline we fall back to the last synced copy and still send.
+        cfg.sync(timeoutMs = 6000)
         val s = cfg.effectiveSettings()
 
         // A call from this number just arrived, so any pending follow-up for
@@ -73,10 +73,11 @@ object SmsEngine {
         }
 
         if (skipReason.isEmpty()) {
-            val cdHours = (if (s.has("cooldownHours")) s.optInt("cooldownHours") else 6).toLong()
-            if (cdHours > 0) {
+            // Cooldown comes from Media (0 = reply to every call).
+            val cdMs = (s.optDouble("cooldownHours", 0.0) * 3600_000L).toLong()
+            if (cdMs > 0) {
                 val last = cfg.lastSentAt(call.number)
-                if (last > 0 && (System.currentTimeMillis() - last) < cdHours * 3600_000L)
+                if (last > 0 && (System.currentTimeMillis() - last) < cdMs)
                     skipReason = "cooldown_active"
             }
         }
@@ -109,7 +110,7 @@ object SmsEngine {
 
         // Optional WhatsApp copy of the reply (same rules already passed).
         if (cfg.localWhatsappEnabled()) {
-            val waMsg = renderWhatsapp(cfg)
+            val waMsg = message // exactly the same text as the SMS, from Media
             val auto = WhatsAppSender.isAccessibilityEnabled(context)
             runCatching {
                 WhatsAppSender.send(context, call.number, waMsg, cfg.localWhatsappBusiness())
@@ -202,7 +203,7 @@ object SmsEngine {
         if (number.length < 10) return false to "Enter a valid 10-digit number."
 
         val cfg = Config(context)
-        if (cfg.cachedSettings() == null && !cfg.localRulesSet()) cfg.sync()
+        cfg.sync(timeoutMs = 8000)
         val message = "[TEST] " + render(cfg)
 
         return try {
@@ -247,22 +248,12 @@ object SmsEngine {
     }
 
     private fun renderFollowup(cfg: Config): String {
-        val tpl = cfg.localFollowupMessage()
         val callback = cfg.effectiveCallback()
-        val base = if (tpl.isNotEmpty()) tpl else (
-            if (callback.isNotEmpty())
-                "Hi, just following up on your recent call to {{businessName}}. We'd still love to help — please call us at {{callbackNumber}}."
-            else
-                "Hi, just following up on your recent call to {{businessName}}. We'd still love to help — please reach out when convenient."
-        )
+        val base = if (callback.isNotEmpty())
+            "Hi, just following up on your recent call to {{businessName}}. We'd still love to help — please call us at {{callbackNumber}}."
+        else
+            "Hi, just following up on your recent call to {{businessName}}. We'd still love to help — please reach out when convenient."
         return substitute(cfg, base)
-    }
-
-    private fun renderWhatsapp(cfg: Config): String {
-        val tpl = cfg.localWhatsappMessage()
-        // Fall back to the SMS reply text when no WhatsApp-specific text is set.
-        if (tpl.isNotEmpty()) return substitute(cfg, tpl)
-        return render(cfg)
     }
 
     private fun substitute(cfg: Config, base: String): String {

@@ -14,7 +14,6 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
-import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -88,21 +87,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Views
-    private lateinit var swEnabled: MaterialSwitch
-    private lateinit var swMissed: MaterialSwitch
-    private lateinit var swRejected: MaterialSwitch
-    private lateinit var swAnswered: MaterialSwitch
-    private lateinit var swOutgoing: MaterialSwitch
+    private lateinit var tvRules: TextView
+    private lateinit var tvMessagePreview: TextView
     private lateinit var swFollowup: MaterialSwitch
-    private lateinit var rgRecipient: RadioGroup
-    private lateinit var etBusinessName: EditText
-    private lateinit var etCallback: EditText
-    private lateinit var etMessage: EditText
     private lateinit var etFollowupHours: EditText
-    private lateinit var etFollowupMessage: EditText
     private lateinit var swWhatsapp: MaterialSwitch
     private lateinit var swWhatsappBusiness: MaterialSwitch
-    private lateinit var etWhatsappMessage: EditText
     private lateinit var etBaseUrl: EditText
     private lateinit var etDeviceId: EditText
     private lateinit var etToken: EditText
@@ -111,21 +101,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvDiagHint: TextView
 
     private fun setupScreen() {
-        swEnabled = findViewById(R.id.swEnabled)
-        swMissed = findViewById(R.id.swMissed)
-        swRejected = findViewById(R.id.swRejected)
-        swAnswered = findViewById(R.id.swAnswered)
-        swOutgoing = findViewById(R.id.swOutgoing)
+        tvRules = findViewById(R.id.tvRules)
+        tvMessagePreview = findViewById(R.id.tvMessagePreview)
         swFollowup = findViewById(R.id.swFollowup)
-        rgRecipient = findViewById(R.id.rgRecipient)
-        etBusinessName = findViewById(R.id.etBusinessName)
-        etCallback = findViewById(R.id.etCallback)
-        etMessage = findViewById(R.id.etMessage)
         etFollowupHours = findViewById(R.id.etFollowupHours)
-        etFollowupMessage = findViewById(R.id.etFollowupMessage)
         swWhatsapp = findViewById(R.id.swWhatsapp)
         swWhatsappBusiness = findViewById(R.id.swWhatsappBusiness)
-        etWhatsappMessage = findViewById(R.id.etWhatsappMessage)
         etBaseUrl = findViewById(R.id.etBaseUrl)
         etDeviceId = findViewById(R.id.etDeviceId)
         etToken = findViewById(R.id.etToken)
@@ -134,30 +115,15 @@ class MainActivity : AppCompatActivity() {
         tvDiagHint = findViewById(R.id.tvDiagHint)
 
         // ── Prefill from saved values (defaults are sensible on first run) ──
-        swEnabled.isChecked = cfg.localEnabled()
-        swMissed.isChecked = cfg.localTrigMissed()
-        swRejected.isChecked = cfg.localTrigRejected()
-        swAnswered.isChecked = cfg.localTrigAnswered()
-        swOutgoing.isChecked = cfg.localTrigOutgoing()
-        when (cfg.localRecipientMode()) {
-            1 -> rgRecipient.check(R.id.rbUnknown)
-            2 -> rgRecipient.check(R.id.rbContacts)
-            else -> rgRecipient.check(R.id.rbEveryone)
-        }
-        etBusinessName.setText(cfg.localBusinessName())
-        etCallback.setText(cfg.localCallback())
-        etMessage.setText(cfg.localMessage())
         swFollowup.isChecked = cfg.localFollowupEnabled()
         etFollowupHours.setText(cfg.localFollowupHours().toString())
-        etFollowupMessage.setText(cfg.localFollowupMessage())
         swWhatsapp.isChecked = cfg.localWhatsappEnabled()
         swWhatsappBusiness.isChecked = cfg.localWhatsappBusiness()
-        etWhatsappMessage.setText(cfg.localWhatsappMessage())
         etBaseUrl.setText(cfg.baseUrl())
         etDeviceId.setText(cfg.deviceId())
         etToken.setText(cfg.token())
 
-        if (cfg.isConfigured() || cfg.localRulesSet()) {
+        if (cfg.isConfigured()) {
             status.text = "Running — replying to calls automatically."
         }
 
@@ -167,24 +133,14 @@ class MainActivity : AppCompatActivity() {
             runCatching { startMonitor() }
             status.text = "Saved. Replying to calls automatically."
             Toast.makeText(this, "Saved & started", Toast.LENGTH_SHORT).show()
+            syncAndShow()
         }
 
         findViewById<MaterialButton>(R.id.btnSync).setOnClickListener {
             // Persist whatever is on screen first, so a sync never discards
             // on-device edits the user just made.
             persistAll()
-            status.text = "Syncing…"
-            Thread {
-                val ok = cfg.sync()
-                runOnUiThread {
-                    status.text = if (ok) {
-                        "Synced with dashboard. Rules saved on-device still apply."
-                    } else {
-                        "Sync failed — check App URL, Device ID & Token."
-                    }
-                    Toast.makeText(this, if (ok) "Synced ✓" else "Sync failed", Toast.LENGTH_SHORT).show()
-                }
-            }.start()
+            syncAndShow()
         }
 
         findViewById<MaterialButton>(R.id.btnStop).setOnClickListener {
@@ -224,7 +180,7 @@ class MainActivity : AppCompatActivity() {
 
         val testNumber = findViewById<EditText>(R.id.etTestNumber)
         findViewById<MaterialButton>(R.id.btnTestSms).setOnClickListener {
-            persistAll() // so the test uses the message currently on screen
+            persistAll()
             val number = testNumber.text.toString().trim()
             status.text = "Sending test SMS…"
             Thread {
@@ -236,9 +192,10 @@ class MainActivity : AppCompatActivity() {
             }.start()
         }
 
+        showSynced()
         requestPerms()
         setupSimPicker()
-        if (cfg.isConfigured() || cfg.localRulesSet()) {
+        if (cfg.isConfigured()) {
             runCatching { startMonitor() }
         }
     }
@@ -250,36 +207,59 @@ class MainActivity : AppCompatActivity() {
             etDeviceId.text.toString().trim(),
             etToken.text.toString().trim()
         )
-        val recipientMode = when (rgRecipient.checkedRadioButtonId) {
-            R.id.rbUnknown -> 1
-            R.id.rbContacts -> 2
-            else -> 0
-        }
         val followupHours = etFollowupHours.text.toString().trim().toIntOrNull() ?: 12
-        cfg.saveRules(
-            enabled = swEnabled.isChecked,
-            missed = swMissed.isChecked,
-            rejected = swRejected.isChecked,
-            answered = swAnswered.isChecked,
-            outgoing = swOutgoing.isChecked,
-            recipientMode = recipientMode,
-            message = etMessage.text.toString().trim(),
-            businessName = etBusinessName.text.toString().trim(),
-            callback = etCallback.text.toString().trim(),
-            followupEnabled = swFollowup.isChecked,
-            followupHours = followupHours,
-            followupMessage = etFollowupMessage.text.toString().trim()
-        )
-        cfg.saveWhatsapp(
-            enabled = swWhatsapp.isChecked,
-            useBusiness = swWhatsappBusiness.isChecked,
-            message = etWhatsappMessage.text.toString().trim()
-        )
+        cfg.saveFollowup(swFollowup.isChecked, followupHours)
+        cfg.saveWhatsapp(swWhatsapp.isChecked, swWhatsappBusiness.isChecked)
+    }
+
+    /** Pulls the latest rules + message from Media and shows them. */
+    private fun syncAndShow() {
+        status.text = "Syncing with Media…"
+        Thread {
+            val ok = cfg.sync()
+            runOnUiThread {
+                showSynced()
+                status.text = if (ok) "Synced with Media ✓ Replying to calls automatically."
+                else if (!cfg.isConfigured()) "Enter Device ID & Token below, then tap Save & Start."
+                else "Sync failed — check App URL, Device ID & Token (using last synced copy)."
+            }
+        }.start()
+    }
+
+    /** Read-only view of what Media has set for this phone. */
+    private fun showSynced() {
+        if (!::tvRules.isInitialized) return
+        if (cfg.cachedSettings() == null) {
+            tvRules.text = "Not synced yet — tap Sync now."
+            tvMessagePreview.text = "—"
+            return
+        }
+        val s = cfg.effectiveSettings()
+        fun mark(b: Boolean) = if (b) "✔" else "✘"
+        val cd = s.optDouble("cooldownHours", 0.0)
+        val who = when {
+            s.optBoolean("recipientAll") -> "Everyone"
+            s.optBoolean("recipientUnknown") && s.optBoolean("recipientContacts") -> "Everyone"
+            s.optBoolean("recipientUnknown") -> "Only unsaved numbers"
+            s.optBoolean("recipientContacts") -> "Only saved contacts"
+            else -> "Nobody (pick recipients in Media)"
+        }
+        tvRules.text = buildString {
+            if (!s.optBoolean("enabled")) append("⚠ Auto-reply is OFF in Media\n")
+            append("${mark(s.optBoolean("triggerMissed"))}  Missed calls\n")
+            append("${mark(s.optBoolean("triggerRejected"))}  Rejected calls\n")
+            append("${mark(s.optBoolean("triggerAnswered"))}  Answered calls\n")
+            append("${mark(s.optBoolean("triggerOutgoing"))}  Outgoing calls\n")
+            append("To: $who\n")
+            append(if (cd <= 0.0) "Every call gets a reply" else "Same number: once every ${if (cd % 1.0 == 0.0) cd.toInt().toString() else cd.toString()} h")
+        }
+        val tpl = cfg.effectiveTemplate()
+        tvMessagePreview.text = if (tpl.isBlank()) "(default message)" else tpl
     }
 
     override fun onResume() {
         super.onResume()
-        if (::tvDiag.isInitialized) refreshStatus()
+        if (::tvDiag.isInitialized) { refreshStatus(); syncAndShow() }
     }
 
     /** Live readout of the things that must be on for replies to actually send. */

@@ -38,6 +38,10 @@ class CallMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Start the "already handled" marker at now on first start, so the
+        // very first call after install gets a reply instead of being used
+        // only to initialise the marker.
+        if (cfg.lastCallTs == 0L) cfg.lastCallTs = System.currentTimeMillis()
         executor.execute { cfg.sync() }
         registerObserver()
         return START_STICKY

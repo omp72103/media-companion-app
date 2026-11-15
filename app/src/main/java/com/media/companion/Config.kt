@@ -38,28 +38,16 @@ class Config(private val ctx: Context) {
     fun simSubscriptionId(): Int = prefs.getInt("simSubId", -1)
     fun setSimSubscriptionId(id: Int) { prefs.edit().putInt("simSubId", id).apply() }
 
-    // ── On-device rules (set from the app's own screen) ──
-    // These let the business owner configure WHEN to reply, WHO gets the SMS
-    // and the MESSAGE text directly on the phone, without needing the
-    // dashboard. Once saved, they take precedence over whatever the server
-    // sync returned; business hours and cooldown (not exposed on-device) are
-    // still taken from the synced settings when present.
-    fun localRulesSet(): Boolean = prefs.getBoolean("l_set", false)
-    fun localEnabled(): Boolean = prefs.getBoolean("l_enabled", true)
-    fun localTrigMissed(): Boolean = prefs.getBoolean("l_missed", true)
-    fun localTrigRejected(): Boolean = prefs.getBoolean("l_rejected", true)
-    fun localTrigAnswered(): Boolean = prefs.getBoolean("l_answered", false)
-    fun localTrigOutgoing(): Boolean = prefs.getBoolean("l_outgoing", false)
-    fun localRecipientMode(): Int = prefs.getInt("l_recip", 0) // 0 everyone, 1 unknown-only, 2 contacts-only
-    fun localMessage(): String = prefs.getString("l_msg", "") ?: ""
-    fun localBusinessName(): String = prefs.getString("l_biz", "") ?: ""
-    fun localCallback(): String = prefs.getString("l_cb", "") ?: ""
+    // ── Rules + message are owned by the Media web app ──
+    // Triggers (missed / rejected / answered / outgoing), recipients, cooldown
+    // and the message text are all set in Media and pulled by sync(). The
+    // phone no longer has its own copy, so there is exactly one place to
+    // change them and Media's switches can never be silently overridden.
 
     // ── Optional follow-up SMS: if the caller hasn't called again within N
     // hours of the first auto-reply, send one more nudge. Off by default.
     fun localFollowupEnabled(): Boolean = prefs.getBoolean("l_fu", false)
     fun localFollowupHours(): Int = prefs.getInt("l_fu_h", 12).coerceIn(1, 168)
-    fun localFollowupMessage(): String = prefs.getString("l_fu_msg", "") ?: ""
 
     // ── Optional WhatsApp auto-reply (Accessibility-driven). Off by default.
     // Sends from the phone's own WhatsApp by automating its UI; needs the
@@ -67,36 +55,18 @@ class Config(private val ctx: Context) {
     // notification. See WhatsAppSender / WhatsAppAutoSendService.
     fun localWhatsappEnabled(): Boolean = prefs.getBoolean("l_wa", false)
     fun localWhatsappBusiness(): Boolean = prefs.getBoolean("l_wa_biz", false)
-    fun localWhatsappMessage(): String = prefs.getString("l_wa_msg", "") ?: ""
 
-    fun saveWhatsapp(enabled: Boolean, useBusiness: Boolean, message: String) {
+    fun saveWhatsapp(enabled: Boolean, useBusiness: Boolean) {
         prefs.edit()
             .putBoolean("l_wa", enabled)
             .putBoolean("l_wa_biz", useBusiness)
-            .putString("l_wa_msg", message)
             .apply()
     }
 
-    fun saveRules(
-        enabled: Boolean, missed: Boolean, rejected: Boolean, answered: Boolean,
-        outgoing: Boolean, recipientMode: Int, message: String,
-        businessName: String, callback: String,
-        followupEnabled: Boolean, followupHours: Int, followupMessage: String
-    ) {
+    fun saveFollowup(enabled: Boolean, hours: Int) {
         prefs.edit()
-            .putBoolean("l_set", true)
-            .putBoolean("l_enabled", enabled)
-            .putBoolean("l_missed", missed)
-            .putBoolean("l_rejected", rejected)
-            .putBoolean("l_answered", answered)
-            .putBoolean("l_outgoing", outgoing)
-            .putInt("l_recip", recipientMode)
-            .putString("l_msg", message)
-            .putString("l_biz", businessName)
-            .putString("l_cb", callback)
-            .putBoolean("l_fu", followupEnabled)
-            .putInt("l_fu_h", followupHours.coerceIn(1, 168))
-            .putString("l_fu_msg", followupMessage)
+            .putBoolean("l_fu", enabled)
+            .putInt("l_fu_h", hours.coerceIn(1, 168))
             .apply()
     }
 
@@ -119,41 +89,25 @@ class Config(private val ctx: Context) {
     fun callbackNumber(): String = prefs.getString("callbackNumber", "") ?: ""
     fun devicePhone(): String = prefs.getString("devicePhone", "") ?: ""
 
-    // ── Effective config = on-device rules layered over synced settings ──
-    // The engine reads these so a phone configured entirely on-device works
-    // with no dashboard at all, while a phone that also syncs still gets
-    // business-hours / cooldown from the server.
+    // ── Effective config = exactly what Media synced ──
+    // If the phone has never synced, fall back to the same defaults the
+    // server uses for a business that never saved its rules.
     fun effectiveSettings(): JSONObject {
-        val base = cachedSettings() ?: JSONObject()
-        if (!localRulesSet()) return base
-        base.put("enabled", localEnabled())
-        base.put("triggerMissed", localTrigMissed())
-        base.put("triggerRejected", localTrigRejected())
-        base.put("triggerAnswered", localTrigAnswered())
-        base.put("triggerOutgoing", localTrigOutgoing())
-        base.put("recipientAll", localRecipientMode() == 0)
-        base.put("recipientUnknown", localRecipientMode() == 1)
-        base.put("recipientContacts", localRecipientMode() == 2)
-        return base
+        cachedSettings()?.let { return it }
+        return JSONObject().apply {
+            put("enabled", true)
+            put("triggerMissed", true); put("triggerRejected", true)
+            put("triggerAnswered", false); put("triggerOutgoing", false)
+            put("recipientAll", true); put("recipientUnknown", false); put("recipientContacts", false)
+            put("businessHoursEnabled", false)
+            put("cooldownHours", 6)
+        }
     }
 
-    fun effectiveTemplate(): String {
-        val l = localMessage()
-        if (localRulesSet() && l.isNotBlank()) return l
-        return cachedTemplate() ?: ""
-    }
-
-    fun effectiveBusinessName(): String {
-        val l = localBusinessName()
-        if (localRulesSet() && l.isNotBlank()) return l
-        return businessName()
-    }
-
-    fun effectiveCallback(): String {
-        val l = localCallback()
-        if (localRulesSet() && l.isNotBlank()) return l
-        return callbackNumber().ifEmpty { devicePhone() }
-    }
+    fun effectiveTemplate(): String = cachedTemplate() ?: ""
+    fun effectiveBusinessName(): String = businessName()
+    fun effectiveCallback(): String = callbackNumber().ifEmpty { devicePhone() }
+    fun lastSyncAt(): Long = prefs.getLong("lastSyncAt", 0L)
 
     // ── Cooldown tracking (per caller number) ──
     fun lastSentAt(number: String): Long = prefs.getLong("cd_$number", 0L)
@@ -165,12 +119,12 @@ class Config(private val ctx: Context) {
         set(v) { prefs.edit().putLong("lastCallTs", v).apply() }
 
     /** Pulls rules + template + contacts from nativeDeviceSync. Returns true on success. */
-    fun sync(): Boolean {
+    fun sync(timeoutMs: Int = 15000): Boolean {
         if (!isConfigured()) return false
         val url = "${baseUrl()}/functions/nativeDeviceSync?device=${deviceId()}&token=${token()}"
         return runCatching {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"; connectTimeout = 15000; readTimeout = 15000
+                requestMethod = "GET"; connectTimeout = timeoutMs; readTimeout = timeoutMs
             }
             try {
                 val raw = BufferedReader(InputStreamReader(conn.inputStream)).readText()
@@ -190,6 +144,7 @@ class Config(private val ctx: Context) {
                     .putString("callbackNumber", s.optString("callbackNumber"))
                     .putString("devicePhone", dev.optString("phoneNumber"))
                     .putStringSet("contacts", contacts)
+                    .putLong("lastSyncAt", System.currentTimeMillis())
                     .apply()
                 true
             } finally {
