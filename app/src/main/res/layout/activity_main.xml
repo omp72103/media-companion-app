@@ -287,6 +287,19 @@
                         android:text="Allow display over other apps"
                         app:cornerRadius="14dp" />
 
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnBattery"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Stop battery from killing the app"
+                        app:cornerRadius="14dp" />
+
+                    <TextView style="@style/HelpText"
+                        android:layout_marginTop="8dp"
+                        android:text="Fully automatic WhatsApp needs all three ✔ in STATUS. If the phone is locked when a call ends, the WhatsApp reply waits and sends by itself as soon as you unlock. On Realme / Oppo / Vivo / Xiaomi also: App info → Battery → Allow background activity, and lock this app in Recents." />
+
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

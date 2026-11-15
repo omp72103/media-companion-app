@@ -43,7 +43,7 @@ including the `.github/` folder). Then:
 
 ### 3. Pair the app
 - In the companion app, paste:
-  - **App URL**: `https://festive-post-flow.base44.app`
+  - **App URL**: `https://media-agency.in`
   - **Device ID** and **Token** from step 1.
 - Tap **Save & Start**, then **Sync Now** (should say "Synced ✓").
 - That's it. The phone now auto-replies to every missed/rejected call.

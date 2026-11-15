@@ -6,11 +6,29 @@ import android.view.accessibility.AccessibilityNodeInfo
 
 /**
  * Completes a WhatsApp auto-reply: when WhatsAppSender has opened a chat with
- * the message pre-filled, this taps the "send" button. Scoped (in its XML
- * config) to the WhatsApp packages only, and it acts ONLY while a send is
- * pending — it never touches WhatsApp during normal use.
+ * the message pre-filled, this taps the "send" button and returns the phone
+ * to the home screen. Scoped (in its XML config) to the WhatsApp packages
+ * only, and it acts ONLY while a send is pending — it never touches WhatsApp
+ * during normal use.
  */
 class WhatsAppAutoSendService : AccessibilityService() {
+
+    companion object {
+        /** Live instance — WhatsAppSender launches chats through it (allowed from background). */
+        @Volatile var instance: WhatsAppAutoSendService? = null
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+        // Anything that queued up while the service was off goes out now.
+        WhatsAppSender.process(this)
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -20,17 +38,17 @@ class WhatsAppAutoSendService : AccessibilityService() {
 
         val root = rootInActiveWindow ?: return
         try {
-            // If the number isn't on WhatsApp, WhatsApp shows an "invalid
-            // number" dialog — dismiss it and give up rather than hang.
+            // Number not on WhatsApp → WhatsApp shows a dialog. Dismiss, skip.
             if (dismissInvalidDialog(root)) {
-                WhatsAppSender.clearPending()
+                WhatsAppSender.onInvalidNumber(this)
+                performGlobalAction(GLOBAL_ACTION_HOME)
                 return
             }
             val send = findSendButton(root, pkg) ?: return
             if (send.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                WhatsAppSender.onSent()
-                // Leave the chat so the business phone returns to idle.
-                performGlobalAction(GLOBAL_ACTION_BACK)
+                WhatsAppSender.onSent(this)
+                // Return the business phone to idle.
+                performGlobalAction(GLOBAL_ACTION_HOME)
             }
         } finally {
             @Suppress("DEPRECATION") root.recycle()
@@ -40,18 +58,24 @@ class WhatsAppAutoSendService : AccessibilityService() {
     override fun onInterrupt() {}
 
     private fun findSendButton(root: AccessibilityNodeInfo, pkg: String): AccessibilityNodeInfo? {
-        // Most reliable: the send FAB's view id.
-        root.findAccessibilityNodeInfosByViewId("$pkg:id/send")
-            ?.firstOrNull { it.isVisibleToUser }
-            ?.let { return it }
-        // Fallback: a clickable node described as "Send".
-        return firstClickableByDesc(root, listOf("send"))
+        for (id in listOf("$pkg:id/send", "$pkg:id/send_container")) {
+            root.findAccessibilityNodeInfosByViewId(id)
+                ?.firstOrNull { it.isVisibleToUser && it.isEnabled }
+                ?.let { return if (it.isClickable) it else clickableParent(it) ?: it }
+        }
+        return firstClickableByDesc(root, listOf("send", "पाठवा", "भेजें"))
+    }
+
+    private fun clickableParent(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var p = node.parent
+        while (p != null) { if (p.isClickable) return p; p = p.parent }
+        return null
     }
 
     private fun dismissInvalidDialog(root: AccessibilityNodeInfo): Boolean {
-        val textNodes = root.findAccessibilityNodeInfosByText("invalid") ?: return false
-        if (textNodes.isEmpty()) return false
-        // Tap the dialog's OK/positive button if present.
+        val hit = listOf("isn't on WhatsApp", "not on WhatsApp", "invalid")
+            .any { (root.findAccessibilityNodeInfosByText(it) ?: emptyList()).isNotEmpty() }
+        if (!hit) return false
         root.findAccessibilityNodeInfosByViewId("android:id/button1")
             ?.firstOrNull()?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         return true

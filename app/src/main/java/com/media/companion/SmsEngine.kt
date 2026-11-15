@@ -111,17 +111,21 @@ object SmsEngine {
         // Optional WhatsApp copy of the reply (same rules already passed).
         if (cfg.localWhatsappEnabled()) {
             val waMsg = message // exactly the same text as the SMS, from Media
-            val auto = WhatsAppSender.isAccessibilityEnabled(context)
+            val waEventId = "${cfg.deviceId()}:${call.number}:whatsapp:${call.startTime}"
+            // Queued and sent automatically; it is logged to the dashboard
+            // only once the Send tap actually happens (WhatsAppSender.onSent).
             runCatching {
-                WhatsAppSender.send(context, call.number, waMsg, cfg.localWhatsappBusiness())
-            }
-            // Log auto-sent WhatsApp replies to the dashboard. The one-tap
-            // fallback is a manual action, so it isn't logged as sent here.
-            if (auto) {
-                val waEventId = "${cfg.deviceId()}:${call.number}:whatsapp:${call.startTime}"
-                report(cfg, waEventId, call, "sent", message = waMsg, channel = "whatsapp")
+                WhatsAppSender.send(context, call.number, waMsg, cfg.localWhatsappBusiness(),
+                    waEventId, call.startTime)
             }
         }
+    }
+
+    /** Logs a WhatsApp reply that was really sent (called off the main thread). */
+    fun reportWhatsappSent(context: Context, number: String, message: String, eventId: String, startTime: Long) {
+        val cfg = Config(context)
+        val id = eventId.ifEmpty { "${cfg.deviceId()}:$number:whatsapp:$startTime" }
+        report(cfg, id, Call(number, "missed", startTime, 0L), "sent", message = message, channel = "whatsapp")
     }
 
     // ── Follow-up SMS scheduling (WorkManager) ──

@@ -4,7 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.IBinder
@@ -29,6 +32,12 @@ class CallMonitorService : Service() {
     private var observer: ContentObserver? = null
     private lateinit var cfg: Config
 
+    // Sends WhatsApp replies that were waiting for the phone to be unlocked.
+    private val unlockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) { WhatsAppSender.process(c) }
+    }
+    private var unlockRegistered = false
+
     override fun onCreate() {
         super.onCreate()
         cfg = Config(this)
@@ -44,6 +53,16 @@ class CallMonitorService : Service() {
         if (cfg.lastCallTs == 0L) cfg.lastCallTs = System.currentTimeMillis()
         executor.execute { cfg.sync() }
         registerObserver()
+        if (!unlockRegistered) {
+            val f = IntentFilter().apply {
+                addAction(Intent.ACTION_USER_PRESENT)
+                addAction(Intent.ACTION_SCREEN_ON)
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(unlockReceiver, f, Context.RECEIVER_NOT_EXPORTED)
+            else registerReceiver(unlockReceiver, f)
+            unlockRegistered = true
+        }
+        WhatsAppSender.process(this)
         return START_STICKY
     }
 
@@ -104,6 +123,7 @@ class CallMonitorService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        if (unlockRegistered) { runCatching { unregisterReceiver(unlockReceiver) }; unlockRegistered = false }
         observer?.let { contentResolver.unregisterContentObserver(it) }
         observer = null
         executor.shutdownNow()

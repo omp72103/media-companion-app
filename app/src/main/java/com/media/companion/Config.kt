@@ -17,9 +17,16 @@ import java.net.URL
  * needs internet; only this sync and the later nativeCallLog report do).
  */
 class Config(private val ctx: Context) {
+    companion object { const val DEFAULT_URL = "https://media-agency.in" }
+
     private val prefs = ctx.getSharedPreferences("media_companion", Context.MODE_PRIVATE)
 
-    fun baseUrl(): String = prefs.getString("baseUrl", "https://festive-post-flow.base44.app") ?: ""
+    // The agency's own domain. Phones paired with the old base44.app address
+    // are moved over automatically (both point at the same backend).
+    fun baseUrl(): String {
+        val v = prefs.getString("baseUrl", DEFAULT_URL) ?: DEFAULT_URL
+        return if (v.contains("base44.app")) DEFAULT_URL else v
+    }
     fun deviceId(): String = prefs.getString("deviceId", "") ?: ""
     fun token(): String = prefs.getString("token", "") ?: ""
     fun isConfigured(): Boolean = deviceId().isNotEmpty() && token().isNotEmpty()
@@ -72,7 +79,7 @@ class Config(private val ctx: Context) {
 
     fun save(base: String, dev: String, tok: String) {
         prefs.edit()
-            .putString("baseUrl", base.ifEmpty { "https://festive-post-flow.base44.app" }.trimEnd('/'))
+            .putString("baseUrl", base.ifEmpty { DEFAULT_URL }.trimEnd('/').let { if (it.contains("base44.app")) DEFAULT_URL else it })
             .putString("deviceId", dev)
             .putString("token", tok)
             .apply()

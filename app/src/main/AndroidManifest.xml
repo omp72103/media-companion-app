@@ -12,6 +12,9 @@
          auto-send (Android 10+ background-activity-launch exemption). Only
          used when WhatsApp auto-send is turned on. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Lets the owner exempt the app from battery optimisation so phones
+         like Realme/Oppo don't kill it and switch WhatsApp auto-send off. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="false"

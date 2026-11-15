@@ -165,6 +165,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        findViewById<MaterialButton>(R.id.btnBattery).setOnClickListener {
+            runCatching {
+                @android.annotation.SuppressLint("BatteryLife")
+                val i = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
+                startActivity(i)
+            }.onFailure {
+                runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+            }
+        }
+
         findViewById<MaterialButton>(R.id.btnRecheck).setOnClickListener { refreshStatus() }
 
         findViewById<MaterialButton>(R.id.btnAppSettings).setOnClickListener {
@@ -285,6 +295,11 @@ class MainActivity : AppCompatActivity() {
             val overlay = Settings.canDrawOverlays(this)
             sb.append("\n${mark(waAcc)}  WhatsApp auto-send (Accessibility)")
             sb.append("\n${mark(overlay)}  Display over other apps")
+            val pm = getSystemService(android.os.PowerManager::class.java)
+            val battery = pm?.isIgnoringBatteryOptimizations(packageName) ?: false
+            sb.append("\n${mark(battery)}  Battery: not killed in background")
+            val waiting = WhatsAppSender.queuedCount(this)
+            if (waiting > 0) sb.append("\n⏳  $waiting WhatsApp repl${if (waiting == 1) "y" else "ies"} waiting for unlock")
         }
         tvDiag.text = sb.toString()
         tvDiagHint.visibility = if (!sms || !callLog || !phone) View.VISIBLE else View.GONE
