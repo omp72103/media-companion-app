@@ -115,8 +115,26 @@ class MainActivity : AppCompatActivity() {
         ruleSwitches["recipientContacts"] = findViewById(R.id.swRecipContacts)
         swIncomingAll = findViewById(R.id.swIncomingAll)
         ruleSwitches.forEach { (key, sw) ->
-            sw.setOnCheckedChangeListener { _, on -> if (!bindingRules) saveRules(mapOf(key to on)) }
+            sw.setOnCheckedChangeListener { _, on ->
+                if (bindingRules) return@setOnCheckedChangeListener
+                val sv = cfg.effectiveSettings()
+                when (key) {
+                    // "All numbers" = Unknown + Saved together.
+                    "recipientAll" -> saveRules(mapOf("recipientAll" to on, "recipientUnknown" to on, "recipientContacts" to on))
+                    "recipientUnknown" -> saveRules(mapOf("recipientUnknown" to on,
+                        "recipientAll" to (on && sv.optBoolean("recipientContacts"))))
+                    "recipientContacts" -> saveRules(mapOf("recipientContacts" to on,
+                        "recipientAll" to (on && sv.optBoolean("recipientUnknown"))))
+                    else -> saveRules(mapOf(key to on))
+                }
+            }
         }
+        val cdButtons = mapOf(R.id.btnCd0 to 0, R.id.btnCd1 to 1, R.id.btnCd6 to 6, R.id.btnCd24 to 24)
+        findViewById<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.tgCooldown)
+            .addOnButtonCheckedListener { _, id, checked ->
+                if (!checked || bindingRules) return@addOnButtonCheckedListener
+                cdButtons[id]?.let { saveRules(mapOf("cooldownHours" to it)) }
+            }
         swIncomingAll.setOnCheckedChangeListener { _, on ->
             if (!bindingRules) saveRules(mapOf("triggerAnswered" to on, "triggerMissed" to on, "triggerRejected" to on))
         }
@@ -264,7 +282,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Saves switch changes on the phone at once, then to Media (reverts if Media can't be reached). */
-    private fun saveRules(values: Map<String, Boolean>) {
+    private fun saveRules(values: Map<String, Any>) {
         values.forEach { (k, v) -> cfg.putCachedSetting(k, v) }
         showSynced()
         status.text = "Saving to Media…"
@@ -296,6 +314,12 @@ class MainActivity : AppCompatActivity() {
         val s = cfg.effectiveSettings()
         bindingRules = true
         ruleSwitches.forEach { (key, sw) -> sw.isChecked = s.optBoolean(key) }
+        ruleSwitches["recipientAll"]?.isChecked =
+            s.optBoolean("recipientUnknown") && s.optBoolean("recipientContacts") ||
+            (s.optBoolean("recipientAll") && !s.optBoolean("recipientUnknown") && !s.optBoolean("recipientContacts"))
+        val cdNow = s.optDouble("cooldownHours", 0.0)
+        val cdId = when { cdNow <= 0.0 -> R.id.btnCd0; cdNow <= 1.0 -> R.id.btnCd1; cdNow <= 6.0 -> R.id.btnCd6; else -> R.id.btnCd24 }
+        findViewById<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.tgCooldown).check(cdId)
         swIncomingAll.isChecked = s.optBoolean("triggerAnswered") && s.optBoolean("triggerMissed") && s.optBoolean("triggerRejected")
         bindingRules = false
         val cd = s.optDouble("cooldownHours", 0.0)

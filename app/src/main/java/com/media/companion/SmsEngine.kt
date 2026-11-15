@@ -60,7 +60,12 @@ object SmsEngine {
         else if (call.type == "answered" && !s.optBoolean("triggerAnswered")) skipReason = "answered_call_no_trigger"
         else if (call.type == "outgoing" && !s.optBoolean("triggerOutgoing")) skipReason = "outgoing_trigger_disabled"
 
-        if (skipReason.isEmpty() && !s.optBoolean("recipientAll")) {
+        // "All" only counts when it isn't contradicted by Unknown/Saved being set
+        // differently (e.g. Saved contacts turned off while All was still on).
+        val unknownOn = s.optBoolean("recipientUnknown")
+        val contactsOn = s.optBoolean("recipientContacts")
+        val allOn = s.optBoolean("recipientAll") && unknownOn == contactsOn
+        if (skipReason.isEmpty() && !allOn) {
             val isContact = call.savedInPhone || cfg.cachedContacts().contains(call.number)
             val okUnknown = s.optBoolean("recipientUnknown") && !isContact
             val okContacts = s.optBoolean("recipientContacts") && isContact

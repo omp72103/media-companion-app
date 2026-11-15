@@ -114,14 +114,14 @@ class Config(private val ctx: Context) {
     fun effectiveTemplate(): String = cachedTemplate() ?: ""
 
     /** Updates the cached copy right away so the next call uses the new switch even before sync. */
-    fun putCachedSetting(key: String, value: Boolean) {
+    fun putCachedSetting(key: String, value: Any) {
         val s = effectiveSettings()
         s.put(key, value)
         prefs.edit().putString("settings", s.toString()).apply()
     }
 
     /** Saves call-type switches to Media (nativeUpdateRules). Returns true on success. */
-    fun pushRules(values: Map<String, Boolean>): Boolean {
+    fun pushRules(values: Map<String, Any>): Boolean {
         if (!isConfigured()) return false
         return runCatching {
             val body = JSONObject().apply {
