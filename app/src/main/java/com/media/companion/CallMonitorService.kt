@@ -13,6 +13,9 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.CallLog
+import android.telephony.PhoneStateListener
+import android.telephony.TelephonyCallback
+import android.telephony.TelephonyManager
 import java.util.concurrent.Executors
 
 /**
@@ -38,6 +41,50 @@ class CallMonitorService : Service() {
     }
     private var unlockRegistered = false
 
+    // ── Ring tracking ──
+    // Some phones (Realme/Oppo/ColorOS) write their own call-log "type" codes,
+    // so an OUTGOING call could be read as missed/rejected and get a reply.
+    // We record every moment the phone actually RINGS: a call-log entry with
+    // no ring around its start time was not an incoming call → outgoing.
+    private var telephonyCallback: Any? = null
+    private var phoneListener: PhoneStateListener? = null
+
+    private fun onCallState(state: Int) {
+        if (state == TelephonyManager.CALL_STATE_RINGING) cfg.recordRing(System.currentTimeMillis())
+    }
+
+    private fun startRingTracking() {
+        if (telephonyCallback != null || phoneListener != null) return
+        val tm = getSystemService(TelephonyManager::class.java) ?: return
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                val cb = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
+                    override fun onCallStateChanged(state: Int) = onCallState(state)
+                }
+                tm.registerTelephonyCallback(mainExecutor, cb)
+                telephonyCallback = cb
+            } else {
+                @Suppress("DEPRECATION")
+                val l = object : PhoneStateListener() {
+                    @Deprecated("Deprecated in Java")
+                    override fun onCallStateChanged(state: Int, phoneNumber: String?) = onCallState(state)
+                }
+                @Suppress("DEPRECATION") tm.listen(l, PhoneStateListener.LISTEN_CALL_STATE)
+                phoneListener = l
+            }
+            cfg.ringTrackingSince = System.currentTimeMillis()
+        }
+    }
+
+    private fun stopRingTracking() {
+        val tm = getSystemService(TelephonyManager::class.java) ?: return
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 31) (telephonyCallback as? TelephonyCallback)?.let { tm.unregisterTelephonyCallback(it) }
+            @Suppress("DEPRECATION") phoneListener?.let { tm.listen(it, PhoneStateListener.LISTEN_NONE) }
+        }
+        telephonyCallback = null; phoneListener = null
+    }
+
     override fun onCreate() {
         super.onCreate()
         cfg = Config(this)
@@ -52,6 +99,7 @@ class CallMonitorService : Service() {
         // only to initialise the marker.
         if (cfg.lastCallTs == 0L) cfg.lastCallTs = System.currentTimeMillis()
         executor.execute { cfg.sync() }
+        startRingTracking()
         registerObserver()
         if (!unlockRegistered) {
             val f = IntentFilter().apply {
@@ -88,7 +136,8 @@ class CallMonitorService : Service() {
             CallLog.Calls.NUMBER,
             CallLog.Calls.TYPE,
             CallLog.Calls.DURATION,
-            CallLog.Calls.DATE
+            CallLog.Calls.DATE,
+            CallLog.Calls.CACHED_NAME
         )
         val cur = contentResolver.query(
             CallLog.Calls.CONTENT_URI, proj,
@@ -108,14 +157,28 @@ class CallMonitorService : Service() {
                 if (date > maxTs) maxTs = date
                 if (number.length < 10) continue
 
-                val callType = when (type) {
+                // Saved in the phone's contacts? (call log caches the contact name)
+                val savedName = it.getString(4)?.trim().orEmpty()
+
+                var callType = when (type) {
                     CallLog.Calls.OUTGOING_TYPE -> "outgoing"
                     CallLog.Calls.MISSED_TYPE -> "missed"
                     5 /* REJECTED_TYPE */ -> "rejected"
+                    6 /* BLOCKED_TYPE */ -> "blocked"
                     CallLog.Calls.INCOMING_TYPE -> if (duration == 0L) "missed" else "answered"
-                    else -> if (duration == 0L) "missed" else "answered"
+                    // Unknown OEM code: decide by whether the phone rang (below).
+                    else -> "unknown"
                 }
-                SmsEngine.handle(this, SmsEngine.Call(number, callType, date, duration))
+                // Never reply to a call the phone didn't ring for — that was
+                // an outgoing call, whatever type code the phone wrote.
+                if (callType != "outgoing" && callType != "blocked" &&
+                    cfg.ringTrackingWorks() &&
+                    cfg.ringTrackingSince in 1 until date - 2000 && !cfg.rangNear(date)) {
+                    callType = "outgoing"
+                }
+                if (callType == "unknown") callType = if (duration == 0L) "missed" else "answered"
+                if (callType == "blocked") continue
+                SmsEngine.handle(this, SmsEngine.Call(number, callType, date, duration, savedName.isNotEmpty()))
             }
         }
         cfg.lastCallTs = maxTs
@@ -123,6 +186,7 @@ class CallMonitorService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        stopRingTracking()
         if (unlockRegistered) { runCatching { unregisterReceiver(unlockReceiver) }; unlockRegistered = false }
         observer?.let { contentResolver.unregisterContentObserver(it) }
         observer = null

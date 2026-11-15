@@ -33,7 +33,8 @@ object SmsEngine {
         val number: String,
         val type: String,   // missed | rejected | answered | outgoing
         val startTime: Long, // epoch ms
-        val duration: Long
+        val duration: Long,
+        val savedInPhone: Boolean = false // caller is in this phone's contacts
     )
 
     fun handle(context: Context, call: Call) {
@@ -60,7 +61,7 @@ object SmsEngine {
         else if (call.type == "outgoing" && !s.optBoolean("triggerOutgoing")) skipReason = "outgoing_trigger_disabled"
 
         if (skipReason.isEmpty() && !s.optBoolean("recipientAll")) {
-            val isContact = cfg.cachedContacts().contains(call.number)
+            val isContact = call.savedInPhone || cfg.cachedContacts().contains(call.number)
             val okUnknown = s.optBoolean("recipientUnknown") && !isContact
             val okContacts = s.optBoolean("recipientContacts") && isContact
             if (!okUnknown && !okContacts) skipReason = "recipient_condition_not_met"
@@ -88,9 +89,14 @@ object SmsEngine {
         }
 
         val message = render(cfg)
+        val smsAllowed = s.optBoolean("adminSmsAllowed", true)
+        val waAllowed = s.optBoolean("adminWhatsappAllowed", true)
         var outcome = "sent"
         var failure = ""
-        try {
+        if (!smsAllowed) {
+            // Media admin turned SMS off for this business — log it as skipped.
+            report(cfg, eventId, call, "skipped", skipReason = "disabled_by_admin")
+        } else try {
             val mgr = getManager(context, cfg)
             val parts = mgr.divideMessage(message)
             if (parts.size == 1) mgr.sendTextMessage(call.number, null, message, null, null)
@@ -106,10 +112,10 @@ object SmsEngine {
             failure = (e.message ?: "Send error").take(200)
         }
 
-        report(cfg, eventId, call, outcome, message = message, failureReason = failure)
+        if (smsAllowed) report(cfg, eventId, call, outcome, message = message, failureReason = failure)
 
         // Optional WhatsApp copy of the reply (same rules already passed).
-        if (cfg.localWhatsappEnabled()) {
+        if (cfg.localWhatsappEnabled() && waAllowed) {
             val waMsg = message // exactly the same text as the SMS, from Media
             val waEventId = "${cfg.deviceId()}:${call.number}:whatsapp:${call.startTime}"
             // Queued and sent automatically; it is logged to the dashboard

@@ -110,6 +110,9 @@ class MainActivity : AppCompatActivity() {
         ruleSwitches["triggerMissed"] = findViewById(R.id.swMissed)
         ruleSwitches["triggerRejected"] = findViewById(R.id.swRejected)
         ruleSwitches["triggerOutgoing"] = findViewById(R.id.swOutgoing)
+        ruleSwitches["recipientAll"] = findViewById(R.id.swRecipAll)
+        ruleSwitches["recipientUnknown"] = findViewById(R.id.swRecipUnknown)
+        ruleSwitches["recipientContacts"] = findViewById(R.id.swRecipContacts)
         swIncomingAll = findViewById(R.id.swIncomingAll)
         ruleSwitches.forEach { (key, sw) ->
             sw.setOnCheckedChangeListener { _, on -> if (!bindingRules) saveRules(mapOf(key to on)) }
@@ -177,16 +180,6 @@ class MainActivity : AppCompatActivity() {
                         Uri.parse("package:$packageName")
                     )
                 )
-            }
-        }
-
-        findViewById<MaterialButton>(R.id.btnBattery).setOnClickListener {
-            runCatching {
-                @android.annotation.SuppressLint("BatteryLife")
-                val i = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
-                startActivity(i)
-            }.onFailure {
-                runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
             }
         }
 
@@ -306,16 +299,10 @@ class MainActivity : AppCompatActivity() {
         swIncomingAll.isChecked = s.optBoolean("triggerAnswered") && s.optBoolean("triggerMissed") && s.optBoolean("triggerRejected")
         bindingRules = false
         val cd = s.optDouble("cooldownHours", 0.0)
-        val who = when {
-            s.optBoolean("recipientAll") -> "Everyone"
-            s.optBoolean("recipientUnknown") && s.optBoolean("recipientContacts") -> "Everyone"
-            s.optBoolean("recipientUnknown") -> "Only unsaved numbers"
-            s.optBoolean("recipientContacts") -> "Only saved contacts"
-            else -> "Nobody (pick recipients in Media)"
-        }
         tvRules.text = buildString {
             if (!s.optBoolean("enabled")) append("⚠ Auto-reply is OFF\n")
-            append("To: $who\n")
+            if (!s.optBoolean("adminSmsAllowed", true)) append("⛔ SMS turned off by Media admin\n")
+            if (!s.optBoolean("adminWhatsappAllowed", true)) append("⛔ WhatsApp turned off by Media admin\n")
             append(if (cd <= 0.0) "Every call gets a reply" else "Same number: once every ${if (cd % 1.0 == 0.0) cd.toInt().toString() else cd.toString()} h")
         }
         val tpl = cfg.effectiveTemplate()
@@ -350,9 +337,6 @@ class MainActivity : AppCompatActivity() {
             val overlay = Settings.canDrawOverlays(this)
             sb.append("\n${mark(waAcc)}  WhatsApp auto-send (Accessibility)")
             sb.append("\n${mark(overlay)}  Display over other apps")
-            val pm = getSystemService(android.os.PowerManager::class.java)
-            val battery = pm?.isIgnoringBatteryOptimizations(packageName) ?: false
-            sb.append("\n${mark(battery)}  Battery: not killed in background")
             val last = WhatsAppSender.lastResult(this)
             if (last.isNotEmpty()) sb.append("\n\nLast WhatsApp: $last")
             val waiting = WhatsAppSender.queuedCount(this)

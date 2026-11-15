@@ -142,6 +142,26 @@ class Config(private val ctx: Context) {
     fun effectiveCallback(): String = callbackNumber().ifEmpty { devicePhone() }
     fun lastSyncAt(): Long = prefs.getLong("lastSyncAt", 0L)
 
+    // ── Ring tracking (to tell incoming from outgoing on any phone) ──
+    var ringTrackingSince: Long
+        get() = prefs.getLong("ringSince", 0L)
+        set(v) { prefs.edit().putLong("ringSince", v).apply() }
+
+    fun recordRing(ts: Long) {
+        val list = (prefs.getString("rings", "") ?: "").split(',').mapNotNull { it.toLongOrNull() }
+            .filter { ts - it < 24 * 3600_000L }.takeLast(60) + ts
+        prefs.edit().putString("rings", list.joinToString(",")).apply()
+    }
+
+    /** Ring tracking is proven to work on this phone (at least one ring recorded). */
+    fun ringTrackingWorks(): Boolean =
+        (prefs.getString("rings", "") ?: "").split(',').any { it.toLongOrNull() != null }
+
+    /** True if the phone rang within a minute before / 20 s after [callStart]. */
+    fun rangNear(callStart: Long): Boolean =
+        (prefs.getString("rings", "") ?: "").split(',').mapNotNull { it.toLongOrNull() }
+            .any { it in (callStart - 60_000L)..(callStart + 20_000L) }
+
     // ── Cooldown tracking (per caller number) ──
     fun lastSentAt(number: String): Long = prefs.getLong("cd_$number", 0L)
     fun markSent(number: String, ts: Long) { prefs.edit().putLong("cd_$number", ts).apply() }

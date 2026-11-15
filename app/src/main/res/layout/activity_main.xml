@@ -200,7 +200,34 @@
                         android:layout_marginTop="10dp" android:layout_marginBottom="8dp" />
 
                     <TextView style="@style/FieldLabel"
-                        android:text="Who gets it / how often"
+                        android:text="Who gets it"
+                        android:layout_marginBottom="2dp" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swRecipAll"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="All numbers (सगळे नंबर)"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swRecipUnknown"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Unknown numbers (सेव्ह नसलेले)"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swRecipContacts"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="Saved contacts (सेव्ह केलेले)"
+                        android:textSize="15sp"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView style="@style/FieldLabel"
+                        android:text="How often"
+                        android:layout_marginTop="8dp"
                         android:layout_marginBottom="4dp" />
 
                     <TextView
@@ -341,18 +368,11 @@
                         android:text="Allow display over other apps"
                         app:cornerRadius="14dp" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnBattery"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Stop battery from killing the app"
-                        app:cornerRadius="14dp" />
+
 
                     <TextView style="@style/HelpText"
                         android:layout_marginTop="8dp"
-                        android:text="Fully automatic WhatsApp needs all three ✔ in STATUS. If the phone is locked when a call ends, the WhatsApp reply waits and sends by itself as soon as you unlock. On Realme / Oppo / Vivo / Xiaomi also: App info → Battery → Allow background activity, and lock this app in Recents." />
+                        android:text="Fully automatic WhatsApp needs both ✔ in STATUS. If the phone is locked when a call ends, the WhatsApp reply waits and sends by itself as soon as you unlock." />
 
                     <TextView
                         android:layout_width="match_parent"
