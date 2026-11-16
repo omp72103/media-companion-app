@@ -111,7 +111,23 @@ class CallMonitorService : Service() {
             unlockRegistered = true
         }
         WhatsAppSender.process(this)
+        startRelayLoop()
         return START_STICKY
+    }
+
+    // Admin relay phone only: poll for WhatsApp jobs. Cheap no-op on every other phone.
+    private val relayHandler = Handler(Looper.getMainLooper())
+    private var relayLoopOn = false
+    private val relayTick = object : Runnable {
+        override fun run() {
+            executor.execute { runCatching { RelayWorker.tick(this@CallMonitorService) } }
+            relayHandler.postDelayed(this, 20_000L)
+        }
+    }
+    private fun startRelayLoop() {
+        if (relayLoopOn) return
+        relayLoopOn = true
+        relayHandler.postDelayed(relayTick, 5_000L)
     }
 
     private fun registerObserver() {
@@ -186,6 +202,7 @@ class CallMonitorService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        relayHandler.removeCallbacks(relayTick); relayLoopOn = false
         stopRingTracking()
         if (unlockRegistered) { runCatching { unregisterReceiver(unlockReceiver) }; unlockRegistered = false }
         observer?.let { contentResolver.unregisterContentObserver(it) }

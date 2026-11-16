@@ -157,15 +157,18 @@ class Config(private val ctx: Context) {
     // something a modified app can talk its way past.
     fun isAdmin(): Boolean = prefs.getBoolean("isAdmin", false)
 
+    /** This phone is the admin WhatsApp relay phone (chosen in the Admin Control Centre). */
+    fun isRelay(): Boolean = prefs.getBoolean("isRelay", false)
+
     /** POSTs to adminDevices with this phone's own device + token. Returns the parsed JSON (also for 4xx/5xx error bodies), or null if unreachable. */
-    fun adminCall(values: Map<String, Any>): JSONObject? {
+    fun adminCall(values: Map<String, Any>, function: String = "adminDevices"): JSONObject? {
         if (!isConfigured()) return null
         return runCatching {
             val body = JSONObject().apply {
                 put("device", deviceId()); put("token", token())
                 values.forEach { (k, v) -> put(k, v) }
             }
-            val conn = (URL("${baseUrl()}/functions/adminDevices").openConnection() as HttpURLConnection).apply {
+            val conn = (URL("${baseUrl()}/functions/$function").openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"; connectTimeout = 15000; readTimeout = 20000
                 doOutput = true; setRequestProperty("Content-Type", "application/json")
             }
@@ -234,6 +237,7 @@ class Config(private val ctx: Context) {
                     .putBoolean("deviceEnabled", dev.optBoolean("autoSmsEnabled", true))
                     .putString("deviceStatus", dev.optString("status", "active"))
                     .putBoolean("isAdmin", dev.optBoolean("isAdmin", false))
+                    .putBoolean("isRelay", dev.optBoolean("isRelay", false))
                     .putStringSet("contacts", contacts)
                     .putLong("lastSyncAt", System.currentTimeMillis())
                     .apply()

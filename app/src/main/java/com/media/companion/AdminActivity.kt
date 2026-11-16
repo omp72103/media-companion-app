@@ -30,6 +30,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var cfg: Config
     private lateinit var listBox: LinearLayout
     private lateinit var statusText: TextView
+    private lateinit var relayBox: LinearLayout
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -63,9 +64,19 @@ class AdminActivity : AppCompatActivity() {
 
         val refresh = MaterialButton(this).apply {
             text = "Refresh list"
-            setOnClickListener { load() }
+            setOnClickListener { load(); loadRelay() }
         }
         root.addView(refresh)
+
+        relayBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setBackgroundResource(android.R.drawable.dialog_holo_light_frame)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(12) }
+        }
+        root.addView(relayBox)
 
         statusText = TextView(this).apply {
             textSize = 13f
@@ -78,6 +89,73 @@ class AdminActivity : AppCompatActivity() {
 
         setContentView(ScrollView(this).apply { addView(root) })
         load()
+        loadRelay()
+    }
+
+    // ── WhatsApp relay: this admin phone sends WhatsApp for businesses switched to "via relay" ──
+
+    private fun loadRelay() {
+        relayBox.removeAllViews()
+        relayBox.addView(TextView(this).apply {
+            text = "WhatsApp relay"; textSize = 16f; setTypeface(typeface, Typeface.BOLD)
+        })
+        val info = TextView(this).apply { textSize = 12f; text = "Loading…"; setPadding(0, dp(2), 0, dp(6)) }
+        relayBox.addView(info)
+        Thread {
+            val res = cfg.adminCall(mapOf("action" to "status"), "whatsappRelay")
+            runOnUiThread {
+                if (res == null || res.has("error")) {
+                    info.text = res?.optString("error").orEmpty().ifBlank { "Could not reach the server." }
+                    return@runOnUiThread
+                }
+                val c = res.getJSONObject("config")
+                val mine = res.optBoolean("isRelayPhone")
+                val counts = res.optJSONObject("counts")
+                info.text = (if (mine) "This phone IS the relay phone." else
+                    if (c.optString("relayDeviceId").isBlank()) "No relay phone chosen yet." else "Another phone is the relay.") +
+                    "\nWaiting: ${counts?.optInt("queued") ?: 0} · Sent in the last hour: ${counts?.optInt("sentLastHour") ?: 0}" +
+                    "\nLimits: ${c.optInt("maxPerHour")}/hour, at least ${c.optInt("minDelaySeconds")}s apart." +
+                    "\nThe relay phone must have WhatsApp, Accessibility ON, and NO payment apps."
+                if (!mine) {
+                    relayBox.addView(MaterialButton(this).apply {
+                        text = "Use this phone as the relay"
+                        setOnClickListener {
+                            Thread {
+                                val r = cfg.adminCall(mapOf("action" to "configure", "useThisPhone" to true), "whatsappRelay")
+                                cfg.sync()
+                                runOnUiThread {
+                                    Toast.makeText(this@AdminActivity,
+                                        if (r?.optBoolean("success") == true) "This phone is now the relay" else "Failed: " + r?.optString("error").orEmpty(),
+                                        Toast.LENGTH_LONG).show()
+                                    loadRelay()
+                                }
+                            }.start()
+                        }
+                    })
+                }
+                relayBox.addView(toggle("Relay running (off = paused)", c.optBoolean("enabled")) { on, revert ->
+                    sendRelay(mapOf("action" to "configure", "enabled" to on), revert)
+                })
+                if (mine) relayBox.addView(TextView(this).apply {
+                    textSize = 12f; setPadding(0, dp(6), 0, 0)
+                    text = "Last: " + RelayWorker.lastNote(this@AdminActivity).ifBlank { "nothing yet" }
+                })
+            }
+        }.start()
+    }
+
+    private fun sendRelay(values: Map<String, Any>, revert: () -> Unit) {
+        Thread {
+            val res = cfg.adminCall(values, "whatsappRelay")
+            val ok = res != null && res.optBoolean("success", false)
+            runOnUiThread {
+                if (ok) Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show()
+                else {
+                    revert()
+                    Toast.makeText(this, "Not saved: " + (res?.optString("error").orEmpty().ifBlank { "Could not reach the server." }), Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 
     private fun load() {
@@ -137,6 +215,9 @@ class AdminActivity : AppCompatActivity() {
         })
         box.addView(toggle("SMS allowed", d.optBoolean("adminSmsAllowed", true)) { on, revert ->
             send(mapOf("action" to "setChannel", "targetDeviceId" to id, "channel" to "sms", "enabled" to on), revert)
+        })
+        box.addView(toggle("WhatsApp via admin relay phone", d.optBoolean("whatsappViaRelay", false)) { on, revert ->
+            send(mapOf("action" to "setChannel", "targetDeviceId" to id, "channel" to "relay", "enabled" to on), revert)
         })
         box.addView(toggle("WhatsApp allowed", d.optBoolean("adminWhatsappAllowed", true)) { on, revert ->
             send(mapOf("action" to "setChannel", "targetDeviceId" to id, "channel" to "whatsapp", "enabled" to on), revert)

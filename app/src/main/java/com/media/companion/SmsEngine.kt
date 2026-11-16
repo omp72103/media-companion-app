@@ -123,7 +123,9 @@ object SmsEngine {
         if (smsAllowed) report(cfg, eventId, call, outcome, message = message, failureReason = failure)
 
         // Optional WhatsApp copy of the reply (same rules already passed).
-        if (cfg.localWhatsappEnabled() && waAllowed) {
+        // Skipped when the admin relay phone sends this business's WhatsApp instead.
+        val viaRelay = s.optBoolean("whatsappViaRelay", false)
+        if (cfg.localWhatsappEnabled() && waAllowed && !viaRelay) {
             val waMsg = message // exactly the same text as the SMS, from Media
             val waEventId = "${cfg.deviceId()}:${call.number}:whatsapp:${call.startTime}"
             // Queued and sent automatically; it is logged to the dashboard
