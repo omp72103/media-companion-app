@@ -186,8 +186,19 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<MaterialButton>(R.id.btnWaAccess).setOnClickListener {
             persistAll()
-            WhatsAppSender.openAccessibilitySettings(this)
-            Toast.makeText(this, "Enable \"Missed Call Auto Reply\" in the list", Toast.LENGTH_LONG).show()
+            AlertDialog.Builder(this)
+                .setTitle("Only on a dedicated phone")
+                .setMessage(
+                    "Automatic WhatsApp needs the Accessibility permission. On a phone that also has Google Pay / PhonePe / UPI or banking apps, Google will BLOCK payments on this phone while this is ON, and tell you to turn Accessibility off.\n\n" +
+                    "If this phone is used for payments, keep this OFF — WhatsApp still works as one-tap and Google Pay keeps working. Only turn it on if this is a dedicated business phone with no payment apps.\n\n" +
+                    "Continue to Accessibility settings?"
+                )
+                .setPositiveButton("Continue") { _, _ ->
+                    WhatsAppSender.openAccessibilitySettings(this)
+                    Toast.makeText(this, "Enable \"Missed Call Auto Reply\" in the list", Toast.LENGTH_LONG).show()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
 
         findViewById<MaterialButton>(R.id.btnWaOverlay).setOnClickListener {
@@ -242,7 +253,7 @@ class MainActivity : AppCompatActivity() {
                 val (ok, msg) = SmsEngine.sendTest(this, number)
                 runOnUiThread {
                     status.text = msg
-                    Toast.makeText(this, if (ok) "Test SMS sent ✓" else "Test SMS failed", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, if (ok) "Test SMS sent ✓" else msg, Toast.LENGTH_LONG).show()
                 }
             }.start()
         }

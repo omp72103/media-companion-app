@@ -419,7 +419,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="Heads up: automating WhatsApp is against WhatsApp's terms and can get this number restricted or banned, and the Accessibility permission makes Play Protect warn more (some phones, like Pixel, block it). Use a dedicated business number."
+                        android:text="Heads up: automatic WhatsApp needs Accessibility, which makes Google BLOCK Google Pay / UPI payments on this phone until it is turned off. It is also against WhatsApp's terms and can get the number banned. Only use it on a dedicated business phone with no payment apps. On a payment phone, keep it OFF and WhatsApp works as one-tap."
                         android:textSize="11sp"
                         android:textColor="@color/danger"
                         android:lineSpacingMultiplier="1.2" />

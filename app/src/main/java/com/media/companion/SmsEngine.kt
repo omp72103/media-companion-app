@@ -228,6 +228,12 @@ object SmsEngine {
         if (number.length < 10) return false to "Enter a valid 10-digit number."
 
         val cfg = Config(context)
+        // Surface the most common cause plainly instead of a generic failure.
+        if (context.checkSelfPermission(android.Manifest.permission.SEND_SMS)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return false to ("SMS permission is OFF. Open app Settings → Permissions → SMS and allow it. " +
+                "On Android 13+/Pixel, first tap the ⋮ menu on the app-info screen → “Allow restricted settings”, then allow SMS.")
+        }
         cfg.sync(timeoutMs = 8000)
         val message = "[TEST] " + render(cfg)
 
@@ -237,8 +243,10 @@ object SmsEngine {
             if (parts.size == 1) mgr.sendTextMessage(number, null, message, null, null)
             else mgr.sendMultipartTextMessage(number, null, parts, null, null)
             true to "Test SMS sent to $number."
+        } catch (e: SecurityException) {
+            false to "SMS blocked by the system (permission denied). Allow SMS in app settings; on Android 13+/Pixel also tap ⋮ → Allow restricted settings."
         } catch (e: Exception) {
-            false to ("Send failed: " + (e.message ?: "unknown error"))
+            false to ("Send failed: " + (e.message ?: "unknown error") + ". Check the SIM has an SMS pack and the right SIM is picked above.")
         }
     }
 
