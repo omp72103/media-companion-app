@@ -179,6 +179,10 @@ class MainActivity : AppCompatActivity() {
             syncAndShow()
         }
 
+        findViewById<MaterialButton>(R.id.btnAdmin).setOnClickListener {
+            startActivity(Intent(this, AdminActivity::class.java))
+        }
+
         findViewById<MaterialButton>(R.id.btnStop).setOnClickListener {
             stopService(Intent(this, CallMonitorService::class.java))
             status.text = "Stopped. No automatic replies will be sent."
@@ -311,6 +315,9 @@ class MainActivity : AppCompatActivity() {
     /** View of what Media has set for this phone (switches + summary). */
     private fun showSynced() {
         if (!::tvRules.isInitialized) return
+        // Admin accounts get the control centre; everyone else never sees it.
+        findViewById<MaterialButton>(R.id.btnAdmin).visibility =
+            if (cfg.isAdmin()) View.VISIBLE else View.GONE
         cfg.effectiveSettings().let { d ->
             bindingRules = true
             ruleSwitches.forEach { (key, sw) -> sw.isChecked = d.optBoolean(key) }

@@ -150,6 +150,33 @@ class Config(private val ctx: Context) {
     fun effectiveCallback(): String = callbackNumber().ifEmpty { devicePhone() }
     fun lastSyncAt(): Long = prefs.getLong("lastSyncAt", 0L)
 
+    // ── Admin control centre ──
+    // True only when Media's last sync said this phone belongs to an
+    // admin-role account. This just decides whether the button is SHOWN; the
+    // server re-checks the role on every adminDevices call, so it is not
+    // something a modified app can talk its way past.
+    fun isAdmin(): Boolean = prefs.getBoolean("isAdmin", false)
+
+    /** POSTs to adminDevices with this phone's own device + token. Returns the parsed JSON (also for 4xx/5xx error bodies), or null if unreachable. */
+    fun adminCall(values: Map<String, Any>): JSONObject? {
+        if (!isConfigured()) return null
+        return runCatching {
+            val body = JSONObject().apply {
+                put("device", deviceId()); put("token", token())
+                values.forEach { (k, v) -> put(k, v) }
+            }
+            val conn = (URL("${baseUrl()}/functions/adminDevices").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"; connectTimeout = 15000; readTimeout = 20000
+                doOutput = true; setRequestProperty("Content-Type", "application/json")
+            }
+            try {
+                java.io.OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+                val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+                JSONObject(BufferedReader(InputStreamReader(stream)).readText())
+            } finally { conn.disconnect() }
+        }.getOrNull()
+    }
+
     // ── Ring tracking (to tell incoming from outgoing on any phone) ──
     var ringTrackingSince: Long
         get() = prefs.getLong("ringSince", 0L)
@@ -206,6 +233,7 @@ class Config(private val ctx: Context) {
                     .putString("devicePhone", dev.optString("phoneNumber"))
                     .putBoolean("deviceEnabled", dev.optBoolean("autoSmsEnabled", true))
                     .putString("deviceStatus", dev.optString("status", "active"))
+                    .putBoolean("isAdmin", dev.optBoolean("isAdmin", false))
                     .putStringSet("contacts", contacts)
                     .putLong("lastSyncAt", System.currentTimeMillis())
                     .apply()

@@ -30,6 +30,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".AdminActivity"
+            android:exported="false" />
+
         <service
             android:name=".CallMonitorService"
             android:foregroundServiceType="dataSync"
