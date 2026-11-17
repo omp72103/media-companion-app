@@ -60,7 +60,10 @@ class Config(private val ctx: Context) {
     // Sends from the phone's own WhatsApp by automating its UI; needs the
     // Accessibility service enabled, otherwise it falls back to a one-tap
     // notification. See WhatsAppSender / WhatsAppAutoSendService.
-    fun localWhatsappEnabled(): Boolean = prefs.getBoolean("l_wa", false)
+    // WhatsApp is an admin-phone feature for now: on every other phone it is hidden
+    // and never sends, whatever an older version may have stored.
+    fun whatsappVisible(): Boolean = isAdmin()
+    fun localWhatsappEnabled(): Boolean = whatsappVisible() && prefs.getBoolean("l_wa", false)
     fun localWhatsappBusiness(): Boolean = prefs.getBoolean("l_wa_biz", false)
 
     fun saveWhatsapp(enabled: Boolean, useBusiness: Boolean) {
@@ -103,6 +106,17 @@ class Config(private val ctx: Context) {
     fun deviceRemoteEnabled(): Boolean = prefs.getBoolean("deviceEnabled", true)
     fun deviceStatus(): String = prefs.getString("deviceStatus", "active") ?: "active"
     fun deviceRemotelyOn(): Boolean = deviceRemoteEnabled() && deviceStatus() == "active"
+
+    // ── Token revoked by the Media admin ──
+    // When Media flips this phone's token, the old one is refused (HTTP 401).
+    // From then on the phone sends NOTHING until a sync succeeds with a valid
+    // token. The flag survives clearing the Device ID / Token fields, so
+    // blanking them is not a way round the block. It is set on
+    // ANY 401, including a reinstalled or freshly cleared phone, so a blocked
+    // phone cannot get round the block by reinstalling.
+    fun tokenRejected(): Boolean = prefs.getBoolean("tokenRejected", false)
+    /** Any 401 from Media means this Device ID + Token is not (or no longer) valid: stop sending. */
+    fun markTokenRejected() { prefs.edit().putBoolean("tokenRejected", true).apply() }
 
     // ── Effective config = exactly what Media synced ──
     // If the phone has never synced, fall back to the same defaults the
@@ -150,6 +164,36 @@ class Config(private val ctx: Context) {
     fun effectiveCallback(): String = callbackNumber().ifEmpty { devicePhone() }
     fun lastSyncAt(): Long = prefs.getLong("lastSyncAt", 0L)
 
+    // ── Admin control centre ──
+    // True only when Media's last sync said this phone belongs to an
+    // admin-role account. This just decides whether the button is SHOWN; the
+    // server re-checks the role on every adminDevices call, so it is not
+    // something a modified app can talk its way past.
+    fun isAdmin(): Boolean = prefs.getBoolean("isAdmin", false)
+
+    /** This phone is the admin WhatsApp relay phone (chosen in the Admin Control Centre). */
+    fun isRelay(): Boolean = prefs.getBoolean("isRelay", false)
+
+    /** POSTs to adminDevices with this phone's own device + token. Returns the parsed JSON (also for 4xx/5xx error bodies), or null if unreachable. */
+    fun adminCall(values: Map<String, Any>, function: String = "adminDevices"): JSONObject? {
+        if (!isConfigured()) return null
+        return runCatching {
+            val body = JSONObject().apply {
+                put("device", deviceId()); put("token", token())
+                values.forEach { (k, v) -> put(k, v) }
+            }
+            val conn = (URL("${baseUrl()}/functions/$function").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"; connectTimeout = 15000; readTimeout = 20000
+                doOutput = true; setRequestProperty("Content-Type", "application/json")
+            }
+            try {
+                java.io.OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+                val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+                JSONObject(BufferedReader(InputStreamReader(stream)).readText())
+            } finally { conn.disconnect() }
+        }.getOrNull()
+    }
+
     // ── Ring tracking (to tell incoming from outgoing on any phone) ──
     var ringTrackingSince: Long
         get() = prefs.getLong("ringSince", 0L)
@@ -188,6 +232,10 @@ class Config(private val ctx: Context) {
                 requestMethod = "GET"; connectTimeout = timeoutMs; readTimeout = timeoutMs
             }
             try {
+                if (conn.responseCode == 401) {
+                    markTokenRejected()
+                    return false
+                }
                 val raw = BufferedReader(InputStreamReader(conn.inputStream)).readText()
                 val json = JSONObject(raw)
                 if (!json.optBoolean("success")) return false
@@ -206,8 +254,11 @@ class Config(private val ctx: Context) {
                     .putString("devicePhone", dev.optString("phoneNumber"))
                     .putBoolean("deviceEnabled", dev.optBoolean("autoSmsEnabled", true))
                     .putString("deviceStatus", dev.optString("status", "active"))
+                    .putBoolean("isAdmin", dev.optBoolean("isAdmin", false))
+                    .putBoolean("isRelay", dev.optBoolean("isRelay", false))
                     .putStringSet("contacts", contacts)
                     .putLong("lastSyncAt", System.currentTimeMillis())
+                    .putBoolean("tokenRejected", false)
                     .apply()
                 true
             } finally {

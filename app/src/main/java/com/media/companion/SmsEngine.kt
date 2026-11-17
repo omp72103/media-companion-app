@@ -56,7 +56,8 @@ object SmsEngine {
         var skipReason = ""
         // Master kill-switch: the dashboard can turn this specific device off
         // (or mark it inactive). That overrides every local rule.
-        if (cfg.isConfigured() && !cfg.deviceRemotelyOn()) skipReason = "disabled_by_dashboard"
+        if (cfg.tokenRejected()) skipReason = "disabled_by_dashboard"
+        else if (cfg.isConfigured() && !cfg.deviceRemotelyOn()) skipReason = "disabled_by_dashboard"
         else if (!s.optBoolean("enabled")) skipReason = "auto_sms_disabled"
         else if (call.type == "missed" && !s.optBoolean("triggerMissed")) skipReason = "missed_trigger_disabled"
         else if (call.type == "rejected" && !s.optBoolean("triggerRejected")) skipReason = "rejected_trigger_disabled"
@@ -123,7 +124,9 @@ object SmsEngine {
         if (smsAllowed) report(cfg, eventId, call, outcome, message = message, failureReason = failure)
 
         // Optional WhatsApp copy of the reply (same rules already passed).
-        if (cfg.localWhatsappEnabled() && waAllowed) {
+        // Skipped when the admin relay phone sends this business's WhatsApp instead.
+        val viaRelay = s.optBoolean("whatsappViaRelay", false)
+        if (cfg.localWhatsappEnabled() && waAllowed && !viaRelay) {
             val waMsg = message // exactly the same text as the SMS, from Media
             val waEventId = "${cfg.deviceId()}:${call.number}:whatsapp:${call.startTime}"
             // Queued and sent automatically; it is logged to the dashboard
@@ -175,6 +178,9 @@ object SmsEngine {
      */
     fun sendFollowupNow(context: Context, number: String, baseTime: Long) {
         val cfg = Config(context)
+        // Ask Media again first: a block placed after the original reply must stop this too.
+        cfg.sync(timeoutMs = 8000)
+        if (cfg.tokenRejected()) return
         if (!cfg.localFollowupEnabled()) return
         if (!cfg.effectiveSettings().optBoolean("enabled")) return
         // They reconnected in the meantime → skip.
@@ -235,6 +241,7 @@ object SmsEngine {
                 "On Android 13+/Pixel, first tap the ⋮ menu on the app-info screen → “Allow restricted settings”, then allow SMS.")
         }
         cfg.sync(timeoutMs = 8000)
+        if (cfg.tokenRejected()) return false to "SMS is paused: Media has changed this phone's token. Get the new token from Media, enter it above and tap Save & Start."
         val message = "[TEST] " + render(cfg)
 
         return try {
@@ -344,6 +351,7 @@ object SmsEngine {
             }
             try {
                 OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+                if (conn.responseCode == 401) { cfg.markTokenRejected(); return }
                 conn.inputStream.use { it.readBytes() }
             } finally {
                 conn.disconnect()

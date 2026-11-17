@@ -285,6 +285,7 @@
                         android:layout_marginTop="10dp" android:layout_marginBottom="8dp" />
 
                     <TextView style="@style/FieldLabel"
+                        android:id="@+id/tvMsgLabel"
                         android:text="Message (sent on SMS and WhatsApp)"
                         android:layout_marginBottom="4dp" />
 
@@ -350,7 +351,12 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- WhatsApp -->
+            <!-- WhatsApp (admin phones only; hidden for everyone else) -->
+            <LinearLayout
+                android:id="@+id/waSection"
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
             <TextView style="@style/SectionLabel" android:text="WHATSAPP (OPTIONAL)" />
 
             <com.google.android.material.card.MaterialCardView
@@ -425,6 +431,7 @@
                         android:lineSpacingMultiplier="1.2" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
 
             <!-- SIM -->
             <TextView style="@style/SectionLabel" android:text="SIM FOR SENDING" />
@@ -535,6 +542,16 @@
                 android:text="Sync rules from dashboard"
                 app:cornerRadius="14dp" />
 
+            <!-- Always visible; opens only for an admin-role account (the server re-checks every call) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAdmin"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Admin Control Centre"
+                app:cornerRadius="14dp" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStop"
                 style="@style/Widget.Material3.Button.OutlinedButton"
@@ -584,6 +601,11 @@
                         android:text="Send test SMS"
                         app:cornerRadius="14dp" />
 
+                    <LinearLayout
+                        android:id="@+id/waTestBox"
+                        android:orientation="vertical"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnTestWa"
                         style="@style/Widget.Material3.Button.TonalButton"
@@ -605,6 +627,7 @@
                     <TextView style="@style/HelpText"
                         android:layout_marginTop="8dp"
                         android:text="For the 10-sec test: tap it, then press Home and leave the phone unlocked. After 10 seconds WhatsApp should open and send by itself, exactly like after a call. Then open this app — STATUS → 'Last WhatsApp' shows what happened." />
+                    </LinearLayout>
 
                     <TextView style="@style/HelpText"
                         android:layout_marginTop="8dp"

@@ -75,7 +75,10 @@ object WhatsAppSender {
             val entry = findInQueue(context, n)
             removeFromQueue(context, n)
             // Log to the Media dashboard only now that it really went out.
-            if (entry != null) {
+            if (entry != null && entry.optString("e").startsWith(RelayWorker.PREFIX)) {
+                // Relay job: remember it went out; RelayWorker reports it to the server.
+                RelayWorker.markSent(context.applicationContext, entry.optString("e").removePrefix(RelayWorker.PREFIX))
+            } else if (entry != null) {
                 val app = context.applicationContext
                 Thread {
                     SmsEngine.reportWhatsappSent(app, n, entry.optString("m"),
@@ -263,6 +266,12 @@ object WhatsAppSender {
     }
 
     fun queuedCount(c: Context): Int = loadQueue(c).length()
+
+    /** True while a reply with this eventId is still waiting in the send queue. */
+    fun isQueuedEvent(c: Context, eventId: String): Boolean {
+        val q = loadQueue(c)
+        return (0 until q.length()).any { q.getJSONObject(it).optString("e") == eventId }
+    }
 
     /** Test path used by the app's test buttons — same queue and auto-send as a real call. */
     fun sendTest(context: Context, number: String, message: String, useBusiness: Boolean) {

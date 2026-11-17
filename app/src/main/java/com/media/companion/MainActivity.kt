@@ -179,6 +179,27 @@ class MainActivity : AppCompatActivity() {
             syncAndShow()
         }
 
+        findViewById<MaterialButton>(R.id.btnAdmin).setOnClickListener {
+            // Always tappable, so it is never a mystery why there is no admin screen.
+            if (!cfg.isConfigured()) {
+                Toast.makeText(this, "Enter the Device ID and Token above, tap Save & Start, then try again.", Toast.LENGTH_LONG).show()
+            } else if (cfg.isAdmin()) {
+                startActivity(Intent(this, AdminActivity::class.java))
+            } else {
+                Toast.makeText(this, "Checking your account…", Toast.LENGTH_SHORT).show()
+                Thread {
+                    val ok = cfg.sync()
+                    runOnUiThread {
+                        when {
+                            cfg.isAdmin() -> startActivity(Intent(this, AdminActivity::class.java))
+                            !ok -> Toast.makeText(this, "Could not reach Media. Check the internet and the Device ID / Token.", Toast.LENGTH_LONG).show()
+                            else -> Toast.makeText(this, "This phone is paired to a normal business account. Admin access needs a phone paired to an admin account of Media.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }.start()
+            }
+        }
+
         findViewById<MaterialButton>(R.id.btnStop).setOnClickListener {
             stopService(Intent(this, CallMonitorService::class.java))
             status.text = "Stopped. No automatic replies will be sent."
@@ -275,7 +296,8 @@ class MainActivity : AppCompatActivity() {
         )
         val followupHours = etFollowupHours.text.toString().trim().toIntOrNull() ?: 12
         cfg.saveFollowup(swFollowup.isChecked, followupHours)
-        cfg.saveWhatsapp(swWhatsapp.isChecked, swWhatsappBusiness.isChecked)
+        // Only where WhatsApp is shown; otherwise a hidden (unchecked) switch would wipe the setting.
+        if (cfg.whatsappVisible()) cfg.saveWhatsapp(swWhatsapp.isChecked, swWhatsappBusiness.isChecked)
     }
 
     /** Pulls the latest rules + message from Media and shows them. */
@@ -311,6 +333,14 @@ class MainActivity : AppCompatActivity() {
     /** View of what Media has set for this phone (switches + summary). */
     private fun showSynced() {
         if (!::tvRules.isInitialized) return
+        // WhatsApp stays hidden on normal phones; this app is SMS-only for them.
+        val waOn = cfg.whatsappVisible()
+        findViewById<View>(R.id.waSection).visibility = if (waOn) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.waTestBox).visibility = if (waOn) View.VISIBLE else View.GONE
+        if (waOn) { swWhatsapp.isChecked = cfg.localWhatsappEnabled(); swWhatsappBusiness.isChecked = cfg.localWhatsappBusiness() }
+        findViewById<TextView>(R.id.tvMsgLabel).text = if (waOn) "Message (sent on SMS and WhatsApp)" else "Message (sent by SMS)"
+        findViewById<MaterialButton>(R.id.btnAdmin).text =
+            if (cfg.isAdmin()) "Admin Control Centre" else "Admin Control Centre (admin accounts only)"
         cfg.effectiveSettings().let { d ->
             bindingRules = true
             ruleSwitches.forEach { (key, sw) -> sw.isChecked = d.optBoolean(key) }
@@ -335,9 +365,10 @@ class MainActivity : AppCompatActivity() {
         bindingRules = false
         val cd = s.optDouble("cooldownHours", 0.0)
         tvRules.text = buildString {
+            if (cfg.tokenRejected()) append("⛔ SMS paused — this phone's token was changed by Media. Get the new token, enter it below and tap Save & Start.\n")
             if (!s.optBoolean("enabled")) append("⚠ Auto-reply is OFF\n")
             if (!s.optBoolean("adminSmsAllowed", true)) append("⛔ SMS turned off by Media admin\n")
-            if (!s.optBoolean("adminWhatsappAllowed", true)) append("⛔ WhatsApp turned off by Media admin\n")
+            if (cfg.whatsappVisible() && !s.optBoolean("adminWhatsappAllowed", true)) append("⛔ WhatsApp turned off by Media admin\n")
             append(if (cd <= 0.0) "Every call gets a reply" else "Same number: once every ${if (cd % 1.0 == 0.0) cd.toInt().toString() else cd.toString()} h")
         }
         val tpl = cfg.effectiveTemplate()
