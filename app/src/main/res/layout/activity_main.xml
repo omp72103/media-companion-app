@@ -535,7 +535,7 @@
                 android:text="Sync rules from dashboard"
                 app:cornerRadius="14dp" />
 
-            <!-- Shown only on phones paired to an admin-role account (see Config.isAdmin) -->
+            <!-- Always visible; opens only for an admin-role account (the server re-checks every call) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAdmin"
                 style="@style/Widget.Material3.Button.TonalButton"
@@ -543,7 +543,6 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="Admin Control Centre"
-                android:visibility="gone"
                 app:cornerRadius="14dp" />
 
             <com.google.android.material.button.MaterialButton

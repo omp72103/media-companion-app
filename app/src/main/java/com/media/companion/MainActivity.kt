@@ -180,7 +180,24 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<MaterialButton>(R.id.btnAdmin).setOnClickListener {
-            startActivity(Intent(this, AdminActivity::class.java))
+            // Always tappable, so it is never a mystery why there is no admin screen.
+            if (!cfg.isConfigured()) {
+                Toast.makeText(this, "Enter the Device ID and Token above, tap Save & Start, then try again.", Toast.LENGTH_LONG).show()
+            } else if (cfg.isAdmin()) {
+                startActivity(Intent(this, AdminActivity::class.java))
+            } else {
+                Toast.makeText(this, "Checking your account…", Toast.LENGTH_SHORT).show()
+                Thread {
+                    val ok = cfg.sync()
+                    runOnUiThread {
+                        when {
+                            cfg.isAdmin() -> startActivity(Intent(this, AdminActivity::class.java))
+                            !ok -> Toast.makeText(this, "Could not reach Media. Check the internet and the Device ID / Token.", Toast.LENGTH_LONG).show()
+                            else -> Toast.makeText(this, "This phone is paired to a normal business account. Admin access needs a phone paired to an admin account of Media.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }.start()
+            }
         }
 
         findViewById<MaterialButton>(R.id.btnStop).setOnClickListener {
@@ -315,9 +332,8 @@ class MainActivity : AppCompatActivity() {
     /** View of what Media has set for this phone (switches + summary). */
     private fun showSynced() {
         if (!::tvRules.isInitialized) return
-        // Admin accounts get the control centre; everyone else never sees it.
-        findViewById<MaterialButton>(R.id.btnAdmin).visibility =
-            if (cfg.isAdmin()) View.VISIBLE else View.GONE
+        findViewById<MaterialButton>(R.id.btnAdmin).text =
+            if (cfg.isAdmin()) "Admin Control Centre" else "Admin Control Centre (admin accounts only)"
         cfg.effectiveSettings().let { d ->
             bindingRules = true
             ruleSwitches.forEach { (key, sw) -> sw.isChecked = d.optBoolean(key) }
