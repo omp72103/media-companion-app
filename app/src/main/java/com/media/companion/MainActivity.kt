@@ -358,6 +358,7 @@ class MainActivity : AppCompatActivity() {
         bindingRules = false
         val cd = s.optDouble("cooldownHours", 0.0)
         tvRules.text = buildString {
+            if (cfg.tokenRejected()) append("⛔ SMS paused — this phone's token was changed by Media. Get the new token, enter it below and tap Save & Start.\n")
             if (!s.optBoolean("enabled")) append("⚠ Auto-reply is OFF\n")
             if (!s.optBoolean("adminSmsAllowed", true)) append("⛔ SMS turned off by Media admin\n")
             if (!s.optBoolean("adminWhatsappAllowed", true)) append("⛔ WhatsApp turned off by Media admin\n")

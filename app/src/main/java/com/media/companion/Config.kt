@@ -104,6 +104,15 @@ class Config(private val ctx: Context) {
     fun deviceStatus(): String = prefs.getString("deviceStatus", "active") ?: "active"
     fun deviceRemotelyOn(): Boolean = deviceRemoteEnabled() && deviceStatus() == "active"
 
+    // ── Token revoked by the Media admin ──
+    // When Media flips this phone's token, the old one is refused (HTTP 401).
+    // From then on the phone sends NOTHING until a sync succeeds with a valid
+    // token. The flag survives clearing the Device ID / Token fields, so
+    // blanking them is not a way round the block. It is only ever set for a
+    // phone that had paired successfully before, so a typo during first-time
+    // setup does not lock anyone out.
+    fun tokenRejected(): Boolean = prefs.getBoolean("tokenRejected", false)
+
     // ── Effective config = exactly what Media synced ──
     // If the phone has never synced, fall back to the same defaults the
     // server uses for a business that never saved its rules.
@@ -218,6 +227,10 @@ class Config(private val ctx: Context) {
                 requestMethod = "GET"; connectTimeout = timeoutMs; readTimeout = timeoutMs
             }
             try {
+                if (conn.responseCode == 401) {
+                    if (lastSyncAt() > 0L) prefs.edit().putBoolean("tokenRejected", true).apply()
+                    return false
+                }
                 val raw = BufferedReader(InputStreamReader(conn.inputStream)).readText()
                 val json = JSONObject(raw)
                 if (!json.optBoolean("success")) return false
@@ -240,6 +253,7 @@ class Config(private val ctx: Context) {
                     .putBoolean("isRelay", dev.optBoolean("isRelay", false))
                     .putStringSet("contacts", contacts)
                     .putLong("lastSyncAt", System.currentTimeMillis())
+                    .putBoolean("tokenRejected", false)
                     .apply()
                 true
             } finally {

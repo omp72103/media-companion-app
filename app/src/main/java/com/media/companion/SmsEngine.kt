@@ -56,7 +56,8 @@ object SmsEngine {
         var skipReason = ""
         // Master kill-switch: the dashboard can turn this specific device off
         // (or mark it inactive). That overrides every local rule.
-        if (cfg.isConfigured() && !cfg.deviceRemotelyOn()) skipReason = "disabled_by_dashboard"
+        if (cfg.tokenRejected()) skipReason = "disabled_by_dashboard"
+        else if (cfg.isConfigured() && !cfg.deviceRemotelyOn()) skipReason = "disabled_by_dashboard"
         else if (!s.optBoolean("enabled")) skipReason = "auto_sms_disabled"
         else if (call.type == "missed" && !s.optBoolean("triggerMissed")) skipReason = "missed_trigger_disabled"
         else if (call.type == "rejected" && !s.optBoolean("triggerRejected")) skipReason = "rejected_trigger_disabled"
@@ -177,6 +178,7 @@ object SmsEngine {
      */
     fun sendFollowupNow(context: Context, number: String, baseTime: Long) {
         val cfg = Config(context)
+        if (cfg.tokenRejected()) return
         if (!cfg.localFollowupEnabled()) return
         if (!cfg.effectiveSettings().optBoolean("enabled")) return
         // They reconnected in the meantime → skip.
@@ -237,6 +239,7 @@ object SmsEngine {
                 "On Android 13+/Pixel, first tap the ⋮ menu on the app-info screen → “Allow restricted settings”, then allow SMS.")
         }
         cfg.sync(timeoutMs = 8000)
+        if (cfg.tokenRejected()) return false to "SMS is paused: Media has changed this phone's token. Get the new token from Media, enter it above and tap Save & Start."
         val message = "[TEST] " + render(cfg)
 
         return try {
