@@ -97,7 +97,7 @@ class AdminActivity : AppCompatActivity() {
     private fun loadRelay() {
         relayBox.removeAllViews()
         relayBox.addView(TextView(this).apply {
-            text = "WhatsApp relay"; textSize = 16f; setTypeface(typeface, Typeface.BOLD)
+            text = "WhatsApp sending phones"; textSize = 16f; setTypeface(typeface, Typeface.BOLD)
         })
         val info = TextView(this).apply { textSize = 12f; text = "Loading…"; setPadding(0, dp(2), 0, dp(6)) }
         relayBox.addView(info)
@@ -111,37 +111,96 @@ class AdminActivity : AppCompatActivity() {
                 val c = res.getJSONObject("config")
                 val mine = res.optBoolean("isRelayPhone")
                 val counts = res.optJSONObject("counts")
-                info.text = (if (mine) "This phone IS the relay phone." else
-                    if (c.optString("relayDeviceId").isBlank()) "No relay phone chosen yet." else "Another phone is the relay.") +
-                    "\nWaiting: ${counts?.optInt("queued") ?: 0} · Sent in the last hour: ${counts?.optInt("sentLastHour") ?: 0}" +
-                    "\nLimits: ${c.optInt("maxPerHour")}/hour, at least ${c.optInt("minDelaySeconds")}s apart." +
-                    "\nThe relay phone must have WhatsApp, Accessibility ON, and NO payment apps."
-                if (!mine) {
+                val phones = res.optJSONArray("phones")
+                val sb = StringBuilder()
+                sb.append("Waiting: ${counts?.optInt("queued") ?: 0} · Sent in the last hour: ${counts?.optInt("sentLastHour") ?: 0}\n")
+                sb.append("Limits (per phone): ${c.optInt("maxPerHour")}/hour, at least ${c.optInt("minDelaySeconds")}s apart.\n")
+                if (phones == null || phones.length() == 0) sb.append("\nNo sending phone yet.")
+                else {
+                    sb.append("\nSending phones (any of them can take the next message):")
+                    for (i in 0 until phones.length()) {
+                        val p = phones.getJSONObject(i)
+                        sb.append("\n • ${p.optString("deviceName")} — ${if (p.optBoolean("online")) "ONLINE" else "OFFLINE"}, sent ${p.optInt("sentLastHour")} in the last hour")
+                    }
+                }
+                info.text = sb.toString()
+
+                // Is THIS phone ready to send? Say exactly what is missing.
+                val accOn = WhatsAppSender.isAccessibilityEnabled(this)
+                val pkg = if (cfg.localWhatsappBusiness()) "com.whatsapp.w4b" else "com.whatsapp"
+                val waInstalled = runCatching { packageManager.getPackageInfo(pkg, 0); true }.getOrDefault(false)
+                relayBox.addView(TextView(this).apply {
+                    textSize = 12f; setPadding(0, dp(6), 0, dp(2))
+                    text = "This phone: " + (if (mine) "SENDING" else "not a sending phone") +
+                        "\n" + (if (accOn) "✔" else "✘") + " Accessibility (needed to press Send)" +
+                        "\n" + (if (waInstalled) "✔" else "✘") + " ${if (pkg.endsWith("w4b")) "WhatsApp Business" else "WhatsApp"} installed" +
+                        "\n✔ Must have NO Google Pay / UPI apps"
+                })
+                if (!accOn) {
                     relayBox.addView(MaterialButton(this).apply {
-                        text = "Use this phone as the relay"
-                        setOnClickListener {
-                            Thread {
-                                val r = cfg.adminCall(mapOf("action" to "configure", "useThisPhone" to true), "whatsappRelay")
-                                cfg.sync()
-                                runOnUiThread {
-                                    Toast.makeText(this@AdminActivity,
-                                        if (r?.optBoolean("success") == true) "This phone is now the relay" else "Failed: " + r?.optString("error").orEmpty(),
-                                        Toast.LENGTH_LONG).show()
-                                    loadRelay()
-                                }
-                            }.start()
-                        }
+                        text = "Open Accessibility settings"
+                        setOnClickListener { WhatsAppSender.openAccessibilitySettings(this@AdminActivity) }
                     })
                 }
-                relayBox.addView(toggle("Relay running (off = paused)", c.optBoolean("enabled")) { on, revert ->
+                relayBox.addView(MaterialButton(this).apply {
+                    text = if (mine) "Stop using this phone to send" else "Use this phone to send WhatsApp"
+                    setOnClickListener {
+                        val action = if (mine) mapOf("action" to "configure", "removeThisPhone" to true)
+                                     else mapOf("action" to "configure", "addThisPhone" to true)
+                        Thread {
+                            val r = cfg.adminCall(action, "whatsappRelay")
+                            cfg.sync()
+                            runOnUiThread {
+                                Toast.makeText(this@AdminActivity,
+                                    if (r?.optBoolean("success") == true) "Saved" else "Failed: " + r?.optString("error").orEmpty(),
+                                    Toast.LENGTH_LONG).show()
+                                loadRelay()
+                            }
+                        }.start()
+                    }
+                })
+                relayBox.addView(toggle("Sending running (off = paused)", c.optBoolean("enabled")) { on, revert ->
                     sendRelay(mapOf("action" to "configure", "enabled" to on), revert)
                 })
                 if (mine) relayBox.addView(TextView(this).apply {
                     textSize = 12f; setPadding(0, dp(6), 0, 0)
                     text = "Last: " + RelayWorker.lastNote(this@AdminActivity).ifBlank { "nothing yet" }
                 })
+
+                // One tap to move every business's WhatsApp to the sending phones, or back.
+                relayBox.addView(TextView(this).apply {
+                    textSize = 12f; setPadding(0, dp(10), 0, dp(2))
+                    text = "All businesses (WhatsApp only — SMS stays on each business's own number):"
+                })
+                relayBox.addView(MaterialButton(this).apply {
+                    text = "Send ALL businesses' WhatsApp from these phones"
+                    setOnClickListener { setAll(true) }
+                })
+                relayBox.addView(MaterialButton(this).apply {
+                    text = "Let each business use its own WhatsApp again"
+                    setOnClickListener { setAll(false) }
+                })
             }
         }.start()
+    }
+
+    private fun setAll(enabled: Boolean) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(if (enabled) "Move all businesses to the sending phones?" else "Give WhatsApp back to each business?")
+            .setMessage("This changes the WhatsApp setting of every business at once. SMS is not affected.")
+            .setPositiveButton("Yes") { _, _ ->
+                Thread {
+                    val r = cfg.adminCall(mapOf("action" to "setRelayAll", "enabled" to enabled), "adminDevices")
+                    runOnUiThread {
+                        Toast.makeText(this,
+                            if (r?.optBoolean("success") == true) "Done — ${r.optInt("changed")} business(es) changed" else "Failed: " + r?.optString("error").orEmpty(),
+                            Toast.LENGTH_LONG).show()
+                        load()
+                    }
+                }.start()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun sendRelay(values: Map<String, Any>, revert: () -> Unit) {

@@ -53,7 +53,12 @@ object RelayWorker {
     fun tick(context: Context) {
         val app = context.applicationContext
         val cfg = Config(app)
-        if (!cfg.isRelay() || !cfg.isConfigured()) return
+        if (!cfg.isConfigured()) return
+        // Pool membership is decided on the server and learned through sync, so re-sync
+        // now and then: a phone added to the pool starts sending, a removed one stops.
+        val staleMs = if (cfg.isRelay()) 10 * 60_000L else 3 * 60_000L
+        if (System.currentTimeMillis() - cfg.lastSyncAt() > staleMs) cfg.sync(timeoutMs = 8000)
+        if (!cfg.isRelay()) return
 
         // 1) Report finished jobs.
         val kept = JSONArray()
@@ -79,11 +84,23 @@ object RelayWorker {
         save(app, kept)
         if (kept.length() > 0) return // one job at a time
 
+        // Without Accessibility this phone cannot press Send, so it must NOT take a message:
+        // it would sit unsent. Leaving it queued lets another sending phone take it.
+        if (!WhatsAppSender.isAccessibilityEnabled(app)) {
+            note(app, "Accessibility is OFF — not taking messages. Turn it on in Settings → Accessibility.")
+            return
+        }
+
         // 2) Ask for the next job (server enforces pause + rate limits).
         val res = cfg.adminCall(mapOf("action" to "claim"), "whatsappRelay") ?: run {
             note(app, "Can't reach Media"); return
         }
-        if (res.has("error")) { note(app, res.optString("error")); return }
+        if (res.has("error")) {
+            note(app, res.optString("error"))
+            // Probably removed from the sending list: learn the new state right away.
+            if (res.optString("error").contains("not a relay phone", ignoreCase = true)) cfg.sync(timeoutMs = 8000)
+            return
+        }
         val job = res.optJSONObject("job")
         if (job == null) {
             note(app, if (res.optBoolean("paused")) "Relay is paused" else "Waiting for jobs")
