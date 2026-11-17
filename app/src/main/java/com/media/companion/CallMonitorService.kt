@@ -124,10 +124,19 @@ class CallMonitorService : Service() {
             relayHandler.postDelayed(this, 20_000L)
         }
     }
+    // Every phone: ask Media every 5 minutes whether this phone is still allowed, so a
+    // block takes effect within minutes even if no call comes in.
+    private val guardTick = object : Runnable {
+        override fun run() {
+            executor.execute { runCatching { cfg.sync(timeoutMs = 8000) } }
+            relayHandler.postDelayed(this, 5 * 60_000L)
+        }
+    }
     private fun startRelayLoop() {
         if (relayLoopOn) return
         relayLoopOn = true
         relayHandler.postDelayed(relayTick, 5_000L)
+        relayHandler.postDelayed(guardTick, 60_000L)
     }
 
     private fun registerObserver() {
@@ -202,7 +211,7 @@ class CallMonitorService : Service() {
 
     override fun onDestroy() {
         isRunning = false
-        relayHandler.removeCallbacks(relayTick); relayLoopOn = false
+        relayHandler.removeCallbacks(relayTick); relayHandler.removeCallbacks(guardTick); relayLoopOn = false
         stopRingTracking()
         if (unlockRegistered) { runCatching { unregisterReceiver(unlockReceiver) }; unlockRegistered = false }
         observer?.let { contentResolver.unregisterContentObserver(it) }

@@ -108,10 +108,12 @@ class Config(private val ctx: Context) {
     // When Media flips this phone's token, the old one is refused (HTTP 401).
     // From then on the phone sends NOTHING until a sync succeeds with a valid
     // token. The flag survives clearing the Device ID / Token fields, so
-    // blanking them is not a way round the block. It is only ever set for a
-    // phone that had paired successfully before, so a typo during first-time
-    // setup does not lock anyone out.
+    // blanking them is not a way round the block. It is set on
+    // ANY 401, including a reinstalled or freshly cleared phone, so a blocked
+    // phone cannot get round the block by reinstalling.
     fun tokenRejected(): Boolean = prefs.getBoolean("tokenRejected", false)
+    /** Any 401 from Media means this Device ID + Token is not (or no longer) valid: stop sending. */
+    fun markTokenRejected() { prefs.edit().putBoolean("tokenRejected", true).apply() }
 
     // ── Effective config = exactly what Media synced ──
     // If the phone has never synced, fall back to the same defaults the
@@ -228,7 +230,7 @@ class Config(private val ctx: Context) {
             }
             try {
                 if (conn.responseCode == 401) {
-                    if (lastSyncAt() > 0L) prefs.edit().putBoolean("tokenRejected", true).apply()
+                    markTokenRejected()
                     return false
                 }
                 val raw = BufferedReader(InputStreamReader(conn.inputStream)).readText()

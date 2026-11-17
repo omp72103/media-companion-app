@@ -178,6 +178,8 @@ object SmsEngine {
      */
     fun sendFollowupNow(context: Context, number: String, baseTime: Long) {
         val cfg = Config(context)
+        // Ask Media again first: a block placed after the original reply must stop this too.
+        cfg.sync(timeoutMs = 8000)
         if (cfg.tokenRejected()) return
         if (!cfg.localFollowupEnabled()) return
         if (!cfg.effectiveSettings().optBoolean("enabled")) return
@@ -349,6 +351,7 @@ object SmsEngine {
             }
             try {
                 OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+                if (conn.responseCode == 401) { cfg.markTokenRejected(); return }
                 conn.inputStream.use { it.readBytes() }
             } finally {
                 conn.disconnect()
