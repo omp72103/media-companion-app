@@ -60,7 +60,10 @@ class Config(private val ctx: Context) {
     // Sends from the phone's own WhatsApp by automating its UI; needs the
     // Accessibility service enabled, otherwise it falls back to a one-tap
     // notification. See WhatsAppSender / WhatsAppAutoSendService.
-    fun localWhatsappEnabled(): Boolean = prefs.getBoolean("l_wa", false)
+    // WhatsApp is an admin-phone feature for now: on every other phone it is hidden
+    // and never sends, whatever an older version may have stored.
+    fun whatsappVisible(): Boolean = isAdmin()
+    fun localWhatsappEnabled(): Boolean = whatsappVisible() && prefs.getBoolean("l_wa", false)
     fun localWhatsappBusiness(): Boolean = prefs.getBoolean("l_wa_biz", false)
 
     fun saveWhatsapp(enabled: Boolean, useBusiness: Boolean) {
