@@ -103,6 +103,7 @@ class Config(private val ctx: Context) {
     fun deviceRemoteEnabled(): Boolean = prefs.getBoolean("deviceEnabled", true)
     fun deviceStatus(): String = prefs.getString("deviceStatus", "active") ?: "active"
     fun deviceRemotelyOn(): Boolean = deviceRemoteEnabled() && deviceStatus() == "active"
+    fun isAdmin(): Boolean = prefs.getBoolean("isAdmin", false)
 
     // ── Effective config = exactly what Media synced ──
     // If the phone has never synced, fall back to the same defaults the
@@ -206,6 +207,7 @@ class Config(private val ctx: Context) {
                     .putString("devicePhone", dev.optString("phoneNumber"))
                     .putBoolean("deviceEnabled", dev.optBoolean("autoSmsEnabled", true))
                     .putString("deviceStatus", dev.optString("status", "active"))
+                    .putBoolean("isAdmin", dev.optBoolean("isAdmin", false))
                     .putStringSet("contacts", contacts)
                     .putLong("lastSyncAt", System.currentTimeMillis())
                     .apply()

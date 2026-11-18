@@ -225,6 +225,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        findViewById<MaterialButton>(R.id.btnAdmin).setOnClickListener {
+            startActivity(Intent(this, AdminActivity::class.java))
+        }
+
         val testNumber = findViewById<EditText>(R.id.etTestNumber)
         fun waTest(delayMs: Long) {
             persistAll()
@@ -382,6 +386,7 @@ class MainActivity : AppCompatActivity() {
         }
         tvDiag.text = sb.toString()
         tvDiagHint.visibility = if (!sms || !callLog || !phone) View.VISIBLE else View.GONE
+        findViewById<MaterialButton>(R.id.btnAdmin).visibility = if (cfg.isAdmin()) View.VISIBLE else View.GONE
     }
 
     private fun requestPerms() {

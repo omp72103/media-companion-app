@@ -128,6 +128,17 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAdmin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:visibility="gone"
+                android:text="Admin Control Centre"
+                android:textSize="16sp"
+                app:icon="@android:drawable/ic_menu_manage"
+                app:cornerRadius="14dp" />
+
             <!-- Rules + message: read-only, set in the Media app -->
             <TextView style="@style/SectionLabel" android:text="RULES &amp; MESSAGE (FROM MEDIA)" />
 
