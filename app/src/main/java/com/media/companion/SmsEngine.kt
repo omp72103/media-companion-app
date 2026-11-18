@@ -98,7 +98,6 @@ object SmsEngine {
 
         val message = render(cfg)
         val smsAllowed = s.optBoolean("adminSmsAllowed", true)
-        val waAllowed = s.optBoolean("adminWhatsappAllowed", true)
         var outcome = "sent"
         var failure = ""
         if (!smsAllowed) {
@@ -121,32 +120,6 @@ object SmsEngine {
         }
 
         if (smsAllowed) report(cfg, eventId, call, outcome, message = message, failureReason = failure)
-
-        // Optional WhatsApp copy of the reply (same rules already passed).
-        if (cfg.localWhatsappEnabled() && waAllowed) {
-            val waMsg = message // exactly the same text as the SMS, from Media
-            val waEventId = "${cfg.deviceId()}:${call.number}:whatsapp:${call.startTime}"
-            // Queued and sent automatically; it is logged to the dashboard
-            // only once the Send tap actually happens (WhatsAppSender.onSent).
-            runCatching {
-                WhatsAppSender.send(context, call.number, waMsg, cfg.localWhatsappBusiness(),
-                    waEventId, call.startTime)
-            }
-        }
-    }
-
-    /** The exact reply text Media has set (used by the WhatsApp test buttons). */
-    fun currentMessage(context: Context): String {
-        val cfg = Config(context)
-        cfg.sync(timeoutMs = 8000)
-        return render(cfg)
-    }
-
-    /** Logs a WhatsApp reply that was really sent (called off the main thread). */
-    fun reportWhatsappSent(context: Context, number: String, message: String, eventId: String, startTime: Long) {
-        val cfg = Config(context)
-        val id = eventId.ifEmpty { "${cfg.deviceId()}:$number:whatsapp:$startTime" }
-        report(cfg, id, Call(number, "missed", startTime, 0L), "sent", message = message, channel = "whatsapp")
     }
 
     // ── Follow-up SMS scheduling (WorkManager) ──

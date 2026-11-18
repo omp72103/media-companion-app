@@ -94,8 +94,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvMessagePreview: TextView
     private lateinit var swFollowup: MaterialSwitch
     private lateinit var etFollowupHours: EditText
-    private lateinit var swWhatsapp: MaterialSwitch
-    private lateinit var swWhatsappBusiness: MaterialSwitch
     private lateinit var etBaseUrl: EditText
     private lateinit var etDeviceId: EditText
     private lateinit var etToken: EditText
@@ -141,8 +139,6 @@ class MainActivity : AppCompatActivity() {
         tvMessagePreview = findViewById(R.id.tvMessagePreview)
         swFollowup = findViewById(R.id.swFollowup)
         etFollowupHours = findViewById(R.id.etFollowupHours)
-        swWhatsapp = findViewById(R.id.swWhatsapp)
-        swWhatsappBusiness = findViewById(R.id.swWhatsappBusiness)
         etBaseUrl = findViewById(R.id.etBaseUrl)
         etDeviceId = findViewById(R.id.etDeviceId)
         etToken = findViewById(R.id.etToken)
@@ -153,8 +149,6 @@ class MainActivity : AppCompatActivity() {
         // ── Prefill from saved values (defaults are sensible on first run) ──
         swFollowup.isChecked = cfg.localFollowupEnabled()
         etFollowupHours.setText(cfg.localFollowupHours().toString())
-        swWhatsapp.isChecked = cfg.localWhatsappEnabled()
-        swWhatsappBusiness.isChecked = cfg.localWhatsappBusiness()
         etBaseUrl.setText(cfg.baseUrl())
         etDeviceId.setText(cfg.deviceId())
         etToken.setText(cfg.token())
@@ -184,34 +178,6 @@ class MainActivity : AppCompatActivity() {
             status.text = "Stopped. No automatic replies will be sent."
         }
 
-        findViewById<MaterialButton>(R.id.btnWaAccess).setOnClickListener {
-            persistAll()
-            AlertDialog.Builder(this)
-                .setTitle("Only on a dedicated phone")
-                .setMessage(
-                    "Automatic WhatsApp needs the Accessibility permission. On a phone that also has Google Pay / PhonePe / UPI or banking apps, Google will BLOCK payments on this phone while this is ON, and tell you to turn Accessibility off.\n\n" +
-                    "If this phone is used for payments, keep this OFF — WhatsApp still works as one-tap and Google Pay keeps working. Only turn it on if this is a dedicated business phone with no payment apps.\n\n" +
-                    "Continue to Accessibility settings?"
-                )
-                .setPositiveButton("Continue") { _, _ ->
-                    WhatsAppSender.openAccessibilitySettings(this)
-                    Toast.makeText(this, "Enable \"Missed Call Auto Reply\" in the list", Toast.LENGTH_LONG).show()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
-        }
-
-        findViewById<MaterialButton>(R.id.btnWaOverlay).setOnClickListener {
-            runCatching {
-                startActivity(
-                    Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:$packageName")
-                    )
-                )
-            }
-        }
-
         findViewById<MaterialButton>(R.id.btnRecheck).setOnClickListener { refreshStatus() }
 
         findViewById<MaterialButton>(R.id.btnAppSettings).setOnClickListener {
@@ -230,25 +196,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         val testNumber = findViewById<EditText>(R.id.etTestNumber)
-        fun waTest(delayMs: Long) {
-            persistAll()
-            val number = testNumber.text.toString().replace(Regex("\\D"), "").takeLast(10)
-            if (number.length < 10) { status.text = "Enter a valid 10-digit number."; return }
-            if (!WhatsAppSender.isAccessibilityEnabled(this)) {
-                status.text = "Turn on automatic sending (Accessibility) first."
-            }
-            val biz = cfg.localWhatsappBusiness()
-            status.text = if (delayMs > 0) "Press Home now — WhatsApp test fires in 10 sec…" else "Sending test WhatsApp…"
-            Thread {
-                val msg = "[TEST] " + SmsEngine.currentMessage(this)
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    WhatsAppSender.sendTest(applicationContext, number, msg, biz)
-                }, delayMs)
-            }.start()
-        }
-        findViewById<MaterialButton>(R.id.btnTestWa).setOnClickListener { waTest(0) }
-        findViewById<MaterialButton>(R.id.btnTestWaBg).setOnClickListener { waTest(10_000) }
-
         findViewById<MaterialButton>(R.id.btnTestSms).setOnClickListener {
             persistAll()
             val number = testNumber.text.toString().trim()
@@ -279,7 +226,6 @@ class MainActivity : AppCompatActivity() {
         )
         val followupHours = etFollowupHours.text.toString().trim().toIntOrNull() ?: 12
         cfg.saveFollowup(swFollowup.isChecked, followupHours)
-        cfg.saveWhatsapp(swWhatsapp.isChecked, swWhatsappBusiness.isChecked)
     }
 
     /** Pulls the latest rules + message from Media and shows them. */
@@ -341,7 +287,6 @@ class MainActivity : AppCompatActivity() {
         tvRules.text = buildString {
             if (!s.optBoolean("enabled")) append("⚠ Auto-reply is OFF\n")
             if (!s.optBoolean("adminSmsAllowed", true)) append("⛔ SMS turned off by Media admin\n")
-            if (!s.optBoolean("adminWhatsappAllowed", true)) append("⛔ WhatsApp turned off by Media admin\n")
             append(if (cd <= 0.0) "Every call gets a reply" else "Same number: once every ${if (cd % 1.0 == 0.0) cd.toInt().toString() else cd.toString()} h")
         }
         val tpl = cfg.effectiveTemplate()
@@ -373,16 +318,6 @@ class MainActivity : AppCompatActivity() {
         sb.append("${mark(running)}  Auto-reply service running")
         if (cfg.isConfigured()) {
             sb.append("\n${mark(cfg.deviceRemotelyOn())}  Enabled from dashboard")
-        }
-        if (cfg.localWhatsappEnabled()) {
-            val waAcc = WhatsAppSender.isAccessibilityEnabled(this)
-            val overlay = Settings.canDrawOverlays(this)
-            sb.append("\n${mark(waAcc)}  WhatsApp auto-send (Accessibility)")
-            sb.append("\n${mark(overlay)}  Display over other apps")
-            val last = WhatsAppSender.lastResult(this)
-            if (last.isNotEmpty()) sb.append("\n\nLast WhatsApp: $last")
-            val waiting = WhatsAppSender.queuedCount(this)
-            if (waiting > 0) sb.append("\n⏳  $waiting WhatsApp repl${if (waiting == 1) "y" else "ies"} waiting for unlock")
         }
         tvDiag.text = sb.toString()
         tvDiagHint.visibility = if (!sms || !callLog || !phone) View.VISIBLE else View.GONE
