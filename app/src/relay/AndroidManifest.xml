@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Relay edition (admin WhatsApp relay phone only): adds what WhatsApp auto-send needs. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Lets the call-triggered background code bring WhatsApp to the front to auto-send. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application>
+        <!-- Taps "send" in WhatsApp to deliver the relay message. Off until enabled in Accessibility settings. -->
+        <service
+            android:name=".WhatsAppAutoSendService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/whatsapp_accessibility_config" />
+        </service>
+    </application>
+</manifest>

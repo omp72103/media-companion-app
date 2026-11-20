@@ -62,7 +62,7 @@ class Config(private val ctx: Context) {
     // notification. See WhatsAppSender / WhatsAppAutoSendService.
     // WhatsApp is an admin-phone feature for now: on every other phone it is hidden
     // and never sends, whatever an older version may have stored.
-    fun whatsappVisible(): Boolean = isAdmin()
+    fun whatsappVisible(): Boolean = isAdmin() && ctx.resources.getBoolean(R.bool.relay_edition)
     fun localWhatsappEnabled(): Boolean = whatsappVisible() && prefs.getBoolean("l_wa", false)
     fun localWhatsappBusiness(): Boolean = prefs.getBoolean("l_wa_biz", false)
 

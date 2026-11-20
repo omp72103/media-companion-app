@@ -11,8 +11,18 @@ android {
         applicationId = "com.media.companion"
         minSdk = 26
         targetSdk = 34
-        versionCode = 22
-        versionName = "2.11"
+        versionCode = 23
+        versionName = "2.12"
+    }
+
+    // Two editions of the same app (same package, so they update each other):
+    //  standard - SMS only. No overlay permission, no Accessibility service, so
+    //             Google Pay and other payment apps do not flag it for those.
+    //  relay    - for the admin's dedicated WhatsApp relay phone only.
+    flavorDimensions += "edition"
+    productFlavors {
+        create("standard") { dimension = "edition" }
+        create("relay") { dimension = "edition" }
     }
 
     // Release signing key comes from CI secrets (never committed — this repo is

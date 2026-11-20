@@ -56,7 +56,7 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         run: |
           set -uo pipefail
-          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+          ./gradlew assembleStandardRelease assembleRelayRelease --no-daemon --stacktrace 2>&1 | tee gradle-build.log
           STATUS=${PIPESTATUS[0]}
           if [ "$STATUS" -ne 0 ]; then
             # Emit each real compiler/AAPT error as its own annotation (cache
@@ -71,7 +71,7 @@ jobs:
       - name: Verify release APK signature
         run: |
           set -euo pipefail
-          APK="app/build/outputs/apk/release/app-release.apk"
+          APK="app/build/outputs/apk/standard/release/app-standard-release.apk"
           test -s "$APK"
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose "$APK"
           CERTS=$("$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK")
@@ -84,7 +84,7 @@ jobs:
       - name: Report APK identity (hash, signer, SDK range)
         run: |
           set -euo pipefail
-          APK="app/build/outputs/apk/release/app-release.apk"
+          APK="app/build/outputs/apk/standard/release/app-standard-release.apk"
           BT="$ANDROID_HOME/build-tools/34.0.0"
           SHA=$(sha256sum "$APK" | cut -d' ' -f1)
           CERT_SHA=$("$BT/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
@@ -110,7 +110,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: media-companion-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: app/build/outputs/apk/standard/release/app-standard-release.apk
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload relay edition APK (admin WhatsApp relay phone only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-companion-relay-apk
+          path: app/build/outputs/apk/relay/release/app-relay-release.apk
           retention-days: 90
           if-no-files-found: error
 
