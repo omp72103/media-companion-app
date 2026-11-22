@@ -239,6 +239,13 @@ class Config(private val ctx: Context) {
                 val raw = BufferedReader(InputStreamReader(conn.inputStream)).readText()
                 val json = JSONObject(raw)
                 if (!json.optBoolean("success")) return false
+                // Media says this phone is blocked: stop sending and stay stopped until a
+                // sync with the NEW token succeeds. (Same state as a refused token.)
+                if (json.optBoolean("blocked", false)) {
+                    markTokenRejected()
+                    prefs.edit().putBoolean("deviceEnabled", false).apply()
+                    return false
+                }
                 val s = json.optJSONObject("settings") ?: JSONObject()
                 val tpl = json.optJSONObject("template")
                 val biz = json.optJSONObject("business") ?: JSONObject()
